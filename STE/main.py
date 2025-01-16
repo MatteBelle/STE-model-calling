@@ -7,6 +7,8 @@ import requests
 import fire
 
 from bmtools.agent.singletool import load_single_tools, STQuestionAnswerer
+import sys
+sys.path.append('/Users/a39328/Desktop/TESI/ToolBench')
 from toolbench.inference.server import get_rapidapi_response
 from utils import find_reverse, random_choose, parse_response, strip_end
 
@@ -35,16 +37,16 @@ def main(
         val = val.strip("'")
         os.environ[key] = val
 
-    with open("tool_metadata/tool2cate.json", "r", encoding='utf-8') as f:
+    with open("STE/tool_metadata/tool2cate.json", "r", encoding='utf-8') as f:
         tool2cate = json.load(f)
 
-    with open("tool_metadata/API_descriptions.json", "r", encoding='utf-8') as f:
+    with open("STE/tool_metadata/API_descriptions.json", "r", encoding='utf-8') as f:
         API_descriptions = json.load(f)
 
-    with open("tool_metadata/API_list.json", "r", encoding='utf-8') as f:
+    with open("STE/tool_metadata/API_list.json", "r", encoding='utf-8') as f:
         API_list = json.load(f)
 
-    with open("tool_metadata/API_dict_bmtools.json", "r", encoding='utf-8') as f:
+    with open("STE/tool_metadata/API_dict_bmtools.json", "r", encoding='utf-8') as f:
         API_dict_bmtools = json.load(f)
 
     bm_tools_l = ['search',
