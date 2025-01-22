@@ -3,7 +3,7 @@ import os
 import matplotlib.pyplot as plt
 import numpy as np
 import time
-from ms_llm import chat_my, visualize_messages, get_chat_completion_my    # azure openai
+from my_llm import chat_my, visualize_messages, get_chat_completion_my    # azure openai
 from copy import deepcopy
 import fire
 import random
