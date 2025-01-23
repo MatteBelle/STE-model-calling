@@ -14,6 +14,7 @@ def load_model(model_name, quantization, model_type='llama'):
     model = _class.from_pretrained(
         model_name,
         return_dict=True,
+        #GPU CONFIG
         load_in_8bit=quantization,
         device_map="auto",
         low_cpu_mem_usage=True,

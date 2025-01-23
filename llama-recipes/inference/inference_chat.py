@@ -28,7 +28,9 @@ class StoppingCriteriaSub(StoppingCriteria):
 
     def __init__(self, stops=[], encounters=1):
         super().__init__()
+        #GPU CONFIG
         self.stops = [stop.to("cuda") for stop in stops]
+        #self.stops = [stop.to("cpu") for stop in stops]
 
     def __call__(self, input_ids: torch.LongTensor, scores: torch.FloatTensor):
         for stop in self.stops:
@@ -69,7 +71,8 @@ def main(
     if sys_msg_dir != 'None':
         with open(sys_msg_dir, "r", encoding='utf-8') as f:
             sys_msg = json.load(f)
-
+    
+    #GPU CONFIG
     torch.cuda.manual_seed(seed)
     torch.manual_seed(seed)
     np.random.seed(seed)
@@ -137,7 +140,9 @@ def main(
             with torch.no_grad():
                 tokens = torch.tensor(chat).long()
                 tokens = tokens.unsqueeze(0)
+                #GPU CONFIG
                 tokens = tokens.to("cuda:0")
+                #tokens = tokens.to("cpu")
                 outputs = model.generate(
                     tokens,
                     max_new_tokens=max_new_tokens,
