@@ -4,7 +4,8 @@
 #
 #    pip-compile requirements.in
 #
-accelerate==0.20.3
+#accelerate==0.20.3
+accelerate==0.21.1
     # via -r requirements.in
 aiofiles==23.2.1
     # via gradio
