@@ -61,10 +61,15 @@ def visualize_messages(messages):
         else:
             print(colored("<no content>", role2color[entry['role']]))
 
+<<<<<<< HEAD
 def chat_my(messages, new_message, visualize=True, **params):
     """
     Handles user input and model response, maintaining a message history.
     """
+=======
+
+def chat_my(messages, new_message, visualize=True, **params):
+>>>>>>> b46a1e748fc03d9e56cb7fd48bfc3e09d97b9799
     messages = deepcopy(messages)
     messages.append({"role": "user", "content": new_message})
     response = get_chat_completion_my(messages, **params)
