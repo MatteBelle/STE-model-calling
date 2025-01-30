@@ -5,11 +5,10 @@ import numpy as np
 import time
 import requests
 import fire
-<<<<<<< HEAD
 from transformers import AutoTokenizer, AutoModelForCausalLM
 import torch
 import sys
-
+from utils import find_reverse, random_choose, parse_response, strip_end
 # # Load the LLaMA 2 model and tokenizer
 # MODEL_NAME = "meta-llama/Llama-2-7b-hf"
 # tokenizer = AutoTokenizer.from_pretrained(MODEL_NAME)
@@ -32,27 +31,13 @@ MODEL_NAME = "meta-llama/Llama-2-7b-hf"
 tokenizer = AutoTokenizer.from_pretrained(MODEL_NAME, cache_dir=HF_HOME)
 tokenizer.add_special_tokens({"pad_token": "<PAD>"})
 model = AutoModelForCausalLM.from_pretrained(MODEL_NAME, cache_dir=HF_HOME, torch_dtype=torch.float16, device_map="auto")
-=======
-
-from bmtools.agent.singletool import load_single_tools, STQuestionAnswerer
-import sys
-sys.path.append('/Users/a39328/Desktop/TESI/ToolBench')
-from toolbench.inference.server import get_rapidapi_response
-from utils import find_reverse, random_choose, parse_response, strip_end
-
-from my_llm import chat_my, visualize_messages, get_chat_completion_my
->>>>>>> b46a1e748fc03d9e56cb7fd48bfc3e09d97b9799
 
 def LTM(X, labels):
     assert len(X) == len(labels)
     return ["Query: {} | Solved: {}".format(X[i], labels[i]) for i in range(len(X))]
 
 def main(
-<<<<<<< HEAD
     model_ckpt: str = 'llama-2-7b-hf',
-=======
-    model_ckpt: str = 'gpt-3.5-turbo-16k-0613',
->>>>>>> b46a1e748fc03d9e56cb7fd48bfc3e09d97b9799
     num_episodes: int = 15,
     num_stm_slots: int = 3,
     max_turn: int = 4,
@@ -61,7 +46,6 @@ def main(
     if_visualize: bool = True,
 ):
 
-<<<<<<< HEAD
     # with open("BMTools/secret_keys.sh", "r", encoding='utf-8') as f:
     #     env_variables = f.readlines()
     # for var in env_variables:
@@ -70,16 +54,6 @@ def main(
     #     key, val = var.replace("export", "").strip().split("=")
     #     val = val.strip("'")
     #     os.environ[key] = val
-=======
-    with open("BMTools/secret_keys.sh", "r", encoding='utf-8') as f:
-        env_variables = f.readlines()
-    for var in env_variables:
-        if var.strip() == "":
-            continue
-        key, val = var.replace("export", "").strip().split("=")
-        val = val.strip("'")
-        os.environ[key] = val
->>>>>>> b46a1e748fc03d9e56cb7fd48bfc3e09d97b9799
 
     with open("STE/tool_metadata/tool2cate.json", "r", encoding='utf-8') as f:
         tool2cate = json.load(f)
@@ -90,13 +64,8 @@ def main(
     with open("STE/tool_metadata/API_list.json", "r", encoding='utf-8') as f:
         API_list = json.load(f)
 
-<<<<<<< HEAD
     # with open("STE/tool_metadata/API_dict_bmtools.json", "r", encoding='utf-8') as f:
     #     API_dict_bmtools = json.load(f)
-=======
-    with open("STE/tool_metadata/API_dict_bmtools.json", "r", encoding='utf-8') as f:
-        API_dict_bmtools = json.load(f)
->>>>>>> b46a1e748fc03d9e56cb7fd48bfc3e09d97b9799
 
     bm_tools_l = ['search',
                  'disambiguation',
@@ -111,48 +80,11 @@ def main(
 
     name_to_tool_map_global = dict()
 
-<<<<<<< HEAD
     # Remove bmtools code as instructed
     # For now, we remove loading tools and run_tool function for bmtools
 
     def run_tool(full_API_name, args, truncate=2048):
         pass  # Placeholder, since bmtools and toolbench are not used
-=======
-    for API_name in bm_tools_l:
-        API_item = API_dict_bmtools[API_name]
-        tool_name, tool_url = API_item['parent_tool_name'], API_item['parent_tool_url']
-        name, meta_info = load_single_tools(tool_name, tool_url)
-        agent = STQuestionAnswerer().load_tools(name, meta_info)
-        name_to_tool_map_local = {tool.name: tool for tool in agent.tools}
-        name_to_tool_map_global[API_name] = name_to_tool_map_local[API_name]
-
-    def run_tool(full_API_name, args, truncate=2048):
-
-        if full_API_name.count("%%") == 0:
-            assert full_API_name in bm_tools_l
-
-            tool = name_to_tool_map_global[full_API_name]
-            res = tool.run(
-                args,
-                verbose=False,
-                color='blue',
-            )
-            res = res[:truncate]
-            return res
-
-        tool_name, api_name = full_API_name.split("%%")
-        cate = tool2cate[tool_name]
-
-        result = get_rapidapi_response({
-            "category": cate,
-            "tool_name": tool_name,
-            "api_name": api_name,
-            "tool_input": args,
-            "strip": "filter",
-            "rapidapi_key": rapidapi_key,
-        })
-        return json.dumps(result)
->>>>>>> b46a1e748fc03d9e56cb7fd48bfc3e09d97b9799
 
     PAST_Q_MSG_pre = "Below are queries you have already explored and whether you successfully solved them with the API's help:"
     PAST_Q_MSG_post = "Based on these, try to explore queries that can help you understand the API further; avoid synthesizing queries that are too close to the existing ones."
@@ -168,11 +100,7 @@ def main(
 
         API_name_list = [API]
 
-<<<<<<< HEAD
         with open("/STE/prompts/prompt_explore.txt", "r") as f:
-=======
-        with open("prompts/prompt_explore.txt", "r") as f:
->>>>>>> b46a1e748fc03d9e56cb7fd48bfc3e09d97b9799
             prompt_template = f.read().strip()
 
         template_q, template_a, template_q_follow, template_a_follow = prompt_template.split("=========")
@@ -202,15 +130,10 @@ def main(
                 {"role": "system", "content": "You are a helpful assistant."}
             ]
 
-<<<<<<< HEAD
             # Using LLaMA instead of GPT
             inputs = tokenizer(prompt_q_added_question, return_tensors="pt").to(model.device)
             outputs = model.generate(**inputs, max_length=360, temperature=1.0, pad_token_id=tokenizer.pad_token_id)
             response = tokenizer.decode(outputs[0], skip_special_tokens=True)
-=======
-            response = chat_my(messages, prompt_q_added_question,
-                               temp=1.0, stop="Thought:", visualize=if_visualize, max_tokens=360, model=model_ckpt)[-1]['content']
->>>>>>> b46a1e748fc03d9e56cb7fd48bfc3e09d97b9799
 
             messages = messages + [
                 {"role": "user", "content": prompt_q},
@@ -226,14 +149,9 @@ def main(
             explored_queries.append(query)
 
             chains = []
-<<<<<<< HEAD
             inputs = tokenizer(prompt_a, return_tensors="pt").to(model.device)
             outputs = model.generate(**inputs, max_length=360, temperature=1.0, pad_token_id=tokenizer.pad_token_id)
             temp = tokenizer.decode(outputs[0], skip_special_tokens=True)
-=======
-            messages = chat_my(messages, prompt_a, temp=1.0, stop="Observation:", visualize=if_visualize, max_tokens=360, model=model_ckpt)
-            temp = messages[-1]['content']
->>>>>>> b46a1e748fc03d9e56cb7fd48bfc3e09d97b9799
             parsed_response = parse_response(temp, API_name_list, api_descriptions)
             for _ in range(max_turn):
                 if not parsed_response['parse_successful']:
@@ -247,15 +165,9 @@ def main(
                 parsed_response['observation'] = observation
                 chains.append(parsed_response)
 
-<<<<<<< HEAD
                 inputs = tokenizer("Observation: "+observation, return_tensors="pt").to(model.device)
                 outputs = model.generate(**inputs, max_length=360, temperature=1.0, pad_token_id=tokenizer.pad_token_id)
                 temp = tokenizer.decode(outputs[0], skip_special_tokens=True)
-=======
-                messages = chat_my(messages, "Observation: "+observation,
-                                   temp=1.0, stop="Observation:", visualize=if_visualize, max_tokens=360, model=model_ckpt)
-                temp = messages[-1]['content']
->>>>>>> b46a1e748fc03d9e56cb7fd48bfc3e09d97b9799
                 parsed_response = parse_response(temp, API_name_list, api_descriptions)
 
             if len(chains) == 0 or not chains[-1]['finish']:
@@ -263,14 +175,9 @@ def main(
 
             first_item['chains'] = chains
 
-<<<<<<< HEAD
             inputs = tokenizer(prompt_reflection, return_tensors="pt").to(model.device)
             outputs = model.generate(**inputs, max_length=360, temperature=1.0, pad_token_id=tokenizer.pad_token_id)
             res = tokenizer.decode(outputs[0], skip_special_tokens=True)
-=======
-            messages = chat_my(messages, prompt_reflection, temp=1.0, stop="Observation:", visualize=if_visualize, max_tokens=360, model=model_ckpt)
-            res = messages[-1]['content']
->>>>>>> b46a1e748fc03d9e56cb7fd48bfc3e09d97b9799
             if "No" in res:
                 successful = "No"
             else:
@@ -293,14 +200,9 @@ def main(
                 else:
                     template_q_follow_added_question = template_q_follow
 
-<<<<<<< HEAD
                 inputs = tokenizer(template_q_follow_added_question, return_tensors="pt").to(model.device)
                 outputs = model.generate(**inputs, max_length=360, temperature=1.0, pad_token_id=tokenizer.pad_token_id)
                 response = tokenizer.decode(outputs[0], skip_special_tokens=True)
-=======
-                response = chat_my(messages, template_q_follow_added_question,
-                                   temp=1.0, stop="Thought:", visualize=if_visualize, max_tokens=360, model=model_ckpt)[-1]['content']
->>>>>>> b46a1e748fc03d9e56cb7fd48bfc3e09d97b9799
                 messages = messages + [
                     {"role": "user", "content": template_q_follow},
                     {"role": "assistant", "content": response}
@@ -311,15 +213,9 @@ def main(
                 explored_queries.append(query)
 
                 chains = []
-<<<<<<< HEAD
                 inputs = tokenizer(template_a_follow, return_tensors="pt").to(model.device)
                 outputs = model.generate(**inputs, max_length=360, temperature=1.0, pad_token_id=tokenizer.pad_token_id)
                 temp = tokenizer.decode(outputs[0], skip_special_tokens=True)
-=======
-                messages = chat_my(messages, template_a_follow,
-                                   temp=1.0, stop="Observation:", visualize=if_visualize, max_tokens=360, model=model_ckpt)
-                temp = messages[-1]['content']
->>>>>>> b46a1e748fc03d9e56cb7fd48bfc3e09d97b9799
                 parsed_response = parse_response(temp, API_name_list, api_descriptions)
                 for _ in range(max_turn):
                     if not parsed_response['parse_successful']:
@@ -333,15 +229,9 @@ def main(
                     parsed_response['observation'] = observation
                     chains.append(parsed_response)
 
-<<<<<<< HEAD
                     inputs = tokenizer("Observation: "+observation, return_tensors="pt").to(model.device)
                     outputs = model.generate(**inputs, max_length=360, temperature=1.0, pad_token_id=tokenizer.pad_token_id)
                     temp = tokenizer.decode(outputs[0], skip_special_tokens=True)
-=======
-                    messages = chat_my(messages, "Observation: "+observation,
-                                       temp=1.0, stop="Observation:", visualize=if_visualize, max_tokens=360, model=model_ckpt)
-                    temp = messages[-1]['content']
->>>>>>> b46a1e748fc03d9e56cb7fd48bfc3e09d97b9799
                     parsed_response = parse_response(temp, API_name_list, api_descriptions)
 
                 if len(chains) == 0 or not chains[-1]['finish']:
@@ -349,15 +239,9 @@ def main(
 
                 item['chains'] = chains
 
-<<<<<<< HEAD
                 inputs = tokenizer(prompt_reflection, return_tensors="pt").to(model.device)
                 outputs = model.generate(**inputs, max_length=360, temperature=1.0, pad_token_id=tokenizer.pad_token_id)
                 res = tokenizer.decode(outputs[0], skip_special_tokens=True)
-=======
-                messages = chat_my(messages, prompt_reflection,
-                                   temp=1.0, stop="Observation:", visualize=if_visualize, max_tokens=360, model=model_ckpt)
-                res = messages[-1]['content']
->>>>>>> b46a1e748fc03d9e56cb7fd48bfc3e09d97b9799
                 if "No" in res:
                     successful = "No"
                 else:
