@@ -20,13 +20,9 @@ Reminder:
 
 Action Input:
 {{
-    "task": "value_1",  // e.g., "text-generation", "sentiment-analysis", "question-answering"
-    "model": "value_2", // e.g., "gpt2", "distilbert-base-uncased"
-    "inputs": "value_3", // e.g., "Once upon a time, there was a dragon."
-    "kwargs": {{
-        "key_1": "value_4", // e.g., "max_length": 100, "temperature": 0.7
-        ...
-    }}
+    "key_1": "value_1",
+    ...
+    "key_n": "value_n",
 }}
 
 Remember to ALWAYS use the following format:

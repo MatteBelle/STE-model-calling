@@ -2,7 +2,7 @@
 # This software may be used and distributed according to the terms of the GNU General Public License version 3.
 
 from peft import PeftModel
-from transformers import LlamaForCausalLM, LlamaConfig, MistralForCausalLM
+from transformers import LlamaForCausalLM, LlamaConfig, MistralForCausalLM, BitsAndBytesConfig
 
 # Function to load the main model for text generation
 def load_model(model_name, quantization, model_type='llama'):
@@ -10,12 +10,23 @@ def load_model(model_name, quantization, model_type='llama'):
         _class = LlamaForCausalLM
     elif model_type == 'mistral':
         _class = MistralForCausalLM
+    
+    # CUSTOM
+    if quantization:
+        quantization_config = BitsAndBytesConfig(
+            load_in_8bit=True,  # Use 8-bit quantization
+            llm_int8_enable_fp32_cpu_offload=True  # Enable CPU offloading
+        )
+    else:
+        quantization_config = None
+    # CUSTOM
 
     model = _class.from_pretrained(
         model_name,
         return_dict=True,
         #GPU CONFIG
-        load_in_8bit=quantization,
+        #load_in_8bit=quantization, 
+        quantization_config=quantization_config,  # CUSTOM
         device_map="auto",
         low_cpu_mem_usage=True,
     )
