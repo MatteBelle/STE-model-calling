@@ -18,19 +18,37 @@ from utils import find_reverse, random_choose, parse_response, strip_end
 #     }
 # )
 # model = AutoModelForCausalLM.from_pretrained(MODEL_NAME, torch_dtype=torch.float16, device_map="auto")
+# ----------------------------------------------
+# Set a persistent local cache directory for Hugging Face
+HF_HOME = "/home/belletti/huggingface_cache"
+os.environ["HF_HOME"] = HF_HOME  # Ensure the environment variable is set
 
-import os
-from transformers import AutoTokenizer, AutoModelForCausalLM
-import torch
+# Create the cache directory if it doesn't exist
+os.makedirs(HF_HOME, exist_ok=True)
 
-# Ensure Hugging Face cache directory is used
-HF_HOME = os.getenv("HF_HOME", "/root/.cache/huggingface")
+# Load the LLaMA 2 model and tokenizer, using the cache
 MODEL_NAME = "meta-llama/Llama-2-7b-hf"
-
-# Load from cache instead of downloading
 tokenizer = AutoTokenizer.from_pretrained(MODEL_NAME, cache_dir=HF_HOME)
 tokenizer.add_special_tokens({"pad_token": "<PAD>"})
-model = AutoModelForCausalLM.from_pretrained(MODEL_NAME, cache_dir=HF_HOME, torch_dtype=torch.float16, device_map="auto")
+
+model = AutoModelForCausalLM.from_pretrained(
+    MODEL_NAME, torch_dtype=torch.float16, device_map="auto", cache_dir=HF_HOME
+)
+
+print(f"Model and tokenizer loaded successfully. Cached at {HF_HOME}")
+# ----------------------------------------------
+# import os
+# from transformers import AutoTokenizer, AutoModelForCausalLM
+# import torch
+
+# # Ensure Hugging Face cache directory is used
+# HF_HOME = os.getenv("HF_HOME", "/root/.cache/huggingface")
+# MODEL_NAME = "meta-llama/Llama-2-7b-hf"
+
+# # Load from cache instead of downloading
+# tokenizer = AutoTokenizer.from_pretrained(MODEL_NAME, cache_dir=HF_HOME)
+# tokenizer.add_special_tokens({"pad_token": "<PAD>"})
+# model = AutoModelForCausalLM.from_pretrained(MODEL_NAME, cache_dir=HF_HOME, torch_dtype=torch.float16, device_map="auto")
 
 def LTM(X, labels):
     assert len(X) == len(labels)
