@@ -2,6 +2,7 @@ from transformers import AutoModelForCausalLM, AutoTokenizer
 import torch
 from termcolor import colored
 from copy import deepcopy
+import os
 
 # Set up the Hugging Face cache directory
 HF_HOME = "/huggingface_cache"
@@ -17,7 +18,7 @@ model = AutoModelForCausalLM.from_pretrained(
 )
 print(f"Model and tokenizer loaded successfully. Cached at {HF_HOME}")
 
-def get_chat_completion_my(messages, max_tokens=512, temp=0.7, return_raw=False, stop=None):
+def get_chat_completion_my(messages, model = 'meta-llama/Llama-2-7b-hf', max_tokens=512, temp=0.7, return_raw=False, stop=None):
     """
     Generate a response using LLaMA 2 model.
     """

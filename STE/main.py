@@ -7,8 +7,13 @@ import fire
 from transformers import pipeline  # Import Hugging Face pipeline
 from utils import find_reverse, random_choose, parse_response, strip_end
 from my_llm import chat_my, visualize_messages, get_chat_completion_my
+# Load the LLaMA 2 model and tokenizer, using the cache
+from transformers import AutoTokenizer, AutoModelForCausalLM
+import torch
+from datetime import datetime  # For generating dynamic filenames
 
 def LTM(X, labels):
+    print("DEBUG: Calling LTM function.")
     assert len(X) == len(labels)
     return ["Query: {} | Solved: {}".format(X[i], labels[i]) for i in range(len(X))]
 
@@ -20,36 +25,38 @@ def main(
     dir_write: str = "results/",
     if_visualize: bool = True,
 ):
+    print("DEBUG: Entering main function with parameters:")
+    print(f"DEBUG: model_ckpt={model_ckpt}, num_episodes={num_episodes}, num_stm_slots={num_stm_slots}, max_turn={max_turn}, dir_write={dir_write}, if_visualize={if_visualize}")
+
     # ----------------------------------------------
-    # Set a persistent local cache directory for Hugging Face
+    print("DEBUG: Setting HF_HOME environment variable and creating cache directory if it does not exist.")
     HF_HOME = "/huggingface_cache"
     os.environ["HF_HOME"] = HF_HOME  # Ensure the environment variable is set
     # Create the cache directory if it doesn't exist
     os.makedirs(HF_HOME, exist_ok=True)
 
-    # Load the LLaMA 2 model and tokenizer, using the cache
-    from transformers import AutoTokenizer, AutoModelForCausalLM
-    import torch
-
     MODEL_NAME = "meta-llama/Llama-2-7b-hf"
+    print("DEBUG: Initializing tokenizer from MODEL_NAME.")
     tokenizer = AutoTokenizer.from_pretrained(MODEL_NAME, cache_dir=HF_HOME)
     tokenizer.add_special_tokens({"pad_token": "<PAD>"})
+    print("DEBUG: Initializing model from MODEL_NAME.")
     model = AutoModelForCausalLM.from_pretrained(
         MODEL_NAME, torch_dtype=torch.float16, device_map="auto", cache_dir=HF_HOME
     )
     print(f"Model and tokenizer loaded successfully. Cached at {HF_HOME}")
     # ----------------------------------------------
-    # Load API descriptions and list
-    with open("tool_metadata/API_descriptions.json", "r", encoding='utf-8') as f:
+    print("DEBUG: Loading API descriptions and API list from JSON files.")
+    with open("STE/tool_metadata/API_descriptions.json", "r", encoding='utf-8') as f:
         API_descriptions = json.load(f)
 
-    with open("tool_metadata/API_list.json", "r", encoding='utf-8') as f:
+    with open("STE/tool_metadata/API_list.json", "r", encoding='utf-8') as f:
         API_list = json.load(f)
 
     # Initialize Hugging Face pipeline
     hf_pipeline = pipeline
 
     def run_tool(full_API_name, args, truncate=2048):
+        print("DEBUG: Entering run_tool function with full_API_name:", full_API_name)
         """
         Execute the Hugging Face pipeline API.
         """
@@ -64,9 +71,11 @@ def main(
             kwargs = args.get("kwargs", {})
 
             # Initialize the pipeline
+            print("DEBUG: Initializing pipeline with task:", task, "model:", model)
             pipe = hf_pipeline(task, model=model)
 
             # Execute the pipeline
+            print("DEBUG: Executing pipeline call.")
             result = pipe(inputs, **kwargs)
 
             # Truncate the result if necessary
@@ -83,15 +92,16 @@ def main(
 
     prompt_reflection = "Do you think you successfully fulfilled this query in the end? Respond with \"Yes\" or \"No\"."
 
+    print("DEBUG: Ensuring output directory exists.")
     os.makedirs(dir_write, exist_ok=True)
     data_dict = dict()
 
+    print("DEBUG: Starting iteration over API_list.")
     for API in API_list:
-        print("===== Currently", API, "=====")
-
+        print("DEBUG: Processing API:", API)
         API_name_list = [API]
 
-        with open("prompts/prompt_explore.txt", "r") as f:
+        with open("STE/prompts/prompt_explore.txt", "r") as f:
             prompt_template = f.read().strip()
 
         template_q, template_a, template_q_follow, template_a_follow = prompt_template.split("=========")
@@ -100,7 +110,7 @@ def main(
         all_sessions, explored_queries, whether_successful = [], [], []
 
         for session_id in range(num_episodes):
-            print("==== episode ====", session_id)
+            print("DEBUG: Starting episode:", session_id)
             item_list = []
             first_item = dict()
             api_descriptions = "\n\n".join(["API_name: {}\nDescription: {}".format(temp, API_descriptions[temp]) for temp in API_name_list])
@@ -121,8 +131,9 @@ def main(
                 {"role": "system", "content": "You are a helpful assistant."}
             ]
 
+            print("DEBUG: Generating the first query using chat_my.")
             response = chat_my(messages, prompt_q_added_question,
-                               temp=1.0, stop="Thought:", visualize=if_visualize, max_tokens=360, model=model_ckpt)[-1]['content']
+                               temp=1.0, stop="Thought:", visualize=if_visualize, max_tokens=360, model=model)[-1]['content']
 
             messages = messages + [
                 {"role": "user", "content": prompt_q},
@@ -138,7 +149,8 @@ def main(
             explored_queries.append(query)
 
             chains = []
-            messages = chat_my(messages, prompt_a, temp=1.0, stop="Observation:", visualize=if_visualize, max_tokens=360, model=model_ckpt)
+            print("DEBUG: Processing chain of calls for the first query.")
+            messages = chat_my(messages, prompt_a, temp=1.0, stop="Observation:", visualize=if_visualize, max_tokens=360, model=model)
             temp = messages[-1]['content']
             parsed_response = parse_response(temp, API_name_list, api_descriptions)
             for _ in range(max_turn):
@@ -154,7 +166,7 @@ def main(
                 chains.append(parsed_response)
 
                 messages = chat_my(messages, "Observation: "+observation,
-                                   temp=1.0, stop="Observation:", visualize=if_visualize, max_tokens=360, model=model_ckpt)
+                                   temp=1.0, stop="Observation:", visualize=if_visualize, max_tokens=360, model=model)
                 temp = messages[-1]['content']
                 parsed_response = parse_response(temp, API_name_list, api_descriptions)
 
@@ -163,7 +175,8 @@ def main(
 
             first_item['chains'] = chains
 
-            messages = chat_my(messages, prompt_reflection, temp=1.0, stop="Observation:", visualize=if_visualize, max_tokens=360, model=model_ckpt)
+            print("DEBUG: Running reflection to determine success for the first query.")
+            messages = chat_my(messages, prompt_reflection, temp=1.0, stop="Observation:", visualize=if_visualize, max_tokens=360, model=model)
             res = messages[-1]['content']
             if "No" in res:
                 successful = "No"
@@ -175,7 +188,7 @@ def main(
             item_list.append(first_item)
 
             for _ in range(num_stm_slots-1):
-                print("----------------------------------------")
+                print("DEBUG: Processing a short-term memory slot.")
                 item = dict()
 
                 if len(explored_queries) > 0:
@@ -187,8 +200,9 @@ def main(
                 else:
                     template_q_follow_added_question = template_q_follow
 
+                print("DEBUG: Generating follow-up query using chat_my.")
                 response = chat_my(messages, template_q_follow_added_question,
-                                   temp=1.0, stop="Thought:", visualize=if_visualize, max_tokens=360, model=model_ckpt)[-1]['content']
+                                   temp=1.0, stop="Thought:", visualize=if_visualize, max_tokens=360, model=model)[-1]['content']
                 messages = messages + [
                     {"role": "user", "content": template_q_follow},
                     {"role": "assistant", "content": response}
@@ -199,8 +213,9 @@ def main(
                 explored_queries.append(query)
 
                 chains = []
+                print("DEBUG: Processing chain of calls for the short-term memory slot query.")
                 messages = chat_my(messages, template_a_follow,
-                                   temp=1.0, stop="Observation:", visualize=if_visualize, max_tokens=360, model=model_ckpt)
+                                   temp=1.0, stop="Observation:", visualize=if_visualize, max_tokens=360, model=model)
                 temp = messages[-1]['content']
                 parsed_response = parse_response(temp, API_name_list, api_descriptions)
                 for _ in range(max_turn):
@@ -216,7 +231,7 @@ def main(
                     chains.append(parsed_response)
 
                     messages = chat_my(messages, "Observation: "+observation,
-                                       temp=1.0, stop="Observation:", visualize=if_visualize, max_tokens=360, model=model_ckpt)
+                                       temp=1.0, stop="Observation:", visualize=if_visualize, max_tokens=360, model=model)
                     temp = messages[-1]['content']
                     parsed_response = parse_response(temp, API_name_list, api_descriptions)
 
@@ -225,8 +240,9 @@ def main(
 
                 item['chains'] = chains
 
+                print("DEBUG: Running reflection to determine success for the short-term memory slot query.")
                 messages = chat_my(messages, prompt_reflection,
-                                   temp=1.0, stop="Observation:", visualize=if_visualize, max_tokens=360, model=model_ckpt)
+                                   temp=1.0, stop="Observation:", visualize=if_visualize, max_tokens=360, model=model)
                 res = messages[-1]['content']
                 if "No" in res:
                     successful = "No"
@@ -243,11 +259,30 @@ def main(
                 }
             )
 
+            # Save partial / intermediate results right after each session
+            print("DEBUG: Saving intermediate results for session.")
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S_%f")
+            partial_filename = os.path.join(dir_write, f"intermediate_{API}_session_{session_id}_{timestamp}.json")
+            try:
+                with open(partial_filename, "w", encoding='utf-8') as f:
+                    # Here we store the sessions accumulated so far for this API
+                    json.dump({
+                        "API": API,
+                        "session_id": session_id,
+                        "all_sessions_so_far": all_sessions
+                    }, f, ensure_ascii=False, indent=2)
+                print(f"DEBUG: Intermediate results saved to {partial_filename}")
+            except Exception as e:
+                print(f"DEBUG: Error saving intermediate results: {e}")
+
         data_dict[API] = all_sessions
 
-    with open(os.path.join(dir_write, "data_dict.json"), "w", encoding='utf-8') as f:
+    print("DEBUG: Writing final data_dict to JSON file.")
+    final_data_path = os.path.join(dir_write, "data_dict.json")
+    with open(final_data_path, "w", encoding='utf-8') as f:
         json.dump(data_dict, f)
-
+    print(f"DEBUG: Final data saved to {final_data_path}")
+    print("DEBUG: Finished main function.")
 
 if __name__ == '__main__':
     fire.Fire(main)
