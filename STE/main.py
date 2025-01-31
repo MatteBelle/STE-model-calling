@@ -20,7 +20,7 @@ from utils import find_reverse, random_choose, parse_response, strip_end
 # model = AutoModelForCausalLM.from_pretrained(MODEL_NAME, torch_dtype=torch.float16, device_map="auto")
 # ----------------------------------------------
 # Set a persistent local cache directory for Hugging Face
-HF_HOME = "/home/belletti/huggingface_cache"
+HF_HOME = "/huggingface_cache"
 os.environ["HF_HOME"] = HF_HOME  # Ensure the environment variable is set
 
 # Create the cache directory if it doesn't exist
