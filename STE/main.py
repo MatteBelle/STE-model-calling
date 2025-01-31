@@ -150,7 +150,7 @@ def main(
 
             # Using LLaMA instead of GPT
             inputs = tokenizer(prompt_q_added_question, return_tensors="pt").to(model.device)
-            outputs = model.generate(**inputs, max_length=360, temperature=1.0, pad_token_id=tokenizer.pad_token_id)
+            outputs = model.generate(**inputs, max_length=512, temperature=1.0, pad_token_id=tokenizer.pad_token_id)
             response = tokenizer.decode(outputs[0], skip_special_tokens=True)
 
             messages = messages + [
