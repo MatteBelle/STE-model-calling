@@ -2,9 +2,11 @@ Your task is to answer the user's query as best you can. You have access to the 
 
 {api_descriptions}
 
-Now you have the chance to explore the available APIs. You can do this by 1) synthesizing some natural user query that calling the API could help, and 2) trying to respond to the user query with the help of the APIs. Here, you can focus on queries that only require calling the API once.
+Now you have the chance to explore the available APIs. This involves:
+1) Synthesizing a natural user query that an API call could help answer. Be specific and include necessary details—for example, if the user wants sentiment analysis, include the text to be analyzed; if text generation is required, include a clear prompt; if question-answering is needed, include context and the question.
+2) Responding to the user query with the help of the APIs, focusing on queries that require only a single API call.
 
-Now, first input your synthesized user query. You should make the query natural - for example, try to avoid using the provided API descriptions or API names in the query, as the user does not know what APIs you have access to. Also try to make the query as specific as possible. Input just the user query alone; do NOT solve the query for now.
+Start by inputting your synthesized user query. Make the query as natural as possible without using the provided API descriptions or API names directly (since the user does not know what tools you have). Input just the user query alone; do NOT solve the query for now.
 
 User Query:
 
@@ -21,7 +23,7 @@ Reminder:
 Action Input:
 {{
     "task": "value_1",  // e.g., "text-generation", "sentiment-analysis", "question-answering"
-    "model": "value_2", // e.g., "gpt2", "distilbert-base-uncased"
+    "model": "value_2", // e.g., "llama-2-7b-hf" is default and should not be changed
     "inputs": "value_3", // e.g., "Once upon a time, there was a dragon."
     "kwargs": {{
         "key_1": "value_4", // e.g., "max_length": 100, "temperature": 0.7
