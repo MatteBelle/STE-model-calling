@@ -9,19 +9,24 @@ HF_HOME = "/huggingface_cache"
 os.environ["HF_HOME"] = HF_HOME
 os.makedirs(HF_HOME, exist_ok=True)
 
-# Load the LLaMA 2 model and tokenizer
-MODEL_NAME = "meta-llama/Llama-2-7b-hf"
-tokenizer = AutoTokenizer.from_pretrained(MODEL_NAME, cache_dir=HF_HOME)
-tokenizer.add_special_tokens({"pad_token": "<PAD>"})
-model = AutoModelForCausalLM.from_pretrained(
-    MODEL_NAME, torch_dtype=torch.float16, device_map="auto", cache_dir=HF_HOME
-)
-print(f"Model and tokenizer loaded successfully. Cached at {HF_HOME}")
+tokenizer = None
 
-def get_chat_completion_my(messages, model = 'meta-llama/Llama-2-7b-hf', max_tokens=512, temp=0.7, return_raw=False, stop=None):
+def set_tokenizer(new_tokenizer):
+    """
+    Set the global tokenizer to avoid duplicate loading.
+    """
+    global tokenizer
+    tokenizer = new_tokenizer
+
+def get_chat_completion_my(messages, model=None, max_tokens=512, temp=0.7, return_raw=False, stop=None):
     """
     Generate a response using LLaMA 2 model.
     """
+    if model is None:
+        raise ValueError("A valid model instance must be provided to get_chat_completion_my")
+    if tokenizer is None:
+        raise ValueError("Tokenizer has not been set. Please call set_tokenizer with a valid tokenizer.")
+
     # Format messages for LLaMA-2
     prompt = format_messages(messages)
     inputs = tokenizer(prompt, return_tensors="pt").to(model.device)

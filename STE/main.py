@@ -6,7 +6,7 @@ import time
 import fire
 from transformers import pipeline  # Import Hugging Face pipeline
 from utils import find_reverse, random_choose, parse_response, strip_end
-from my_llm import chat_my, visualize_messages, get_chat_completion_my
+from my_llm import chat_my, visualize_messages, get_chat_completion_my, set_tokenizer
 # Load the LLaMA 2 model and tokenizer, using the cache
 from transformers import AutoTokenizer, AutoModelForCausalLM
 import torch
@@ -45,6 +45,9 @@ def main(
     )
     print(f"Model and tokenizer loaded successfully. Cached at {HF_HOME}")
     # ----------------------------------------------
+    # Set the global tokenizer to avoid duplicate loading
+    set_tokenizer(tokenizer)
+    
     print("DEBUG: Loading API descriptions and API list from JSON files.")
     with open("STE/tool_metadata/API_descriptions.json", "r", encoding='utf-8') as f:
         API_descriptions = json.load(f)
