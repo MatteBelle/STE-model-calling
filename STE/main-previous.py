@@ -3,81 +3,83 @@ import os
 import matplotlib.pyplot as plt
 import numpy as np
 import time
+import requests
 import fire
-from transformers import pipeline  # Import Hugging Face pipeline
+from transformers import AutoTokenizer, AutoModelForCausalLM
+import torch
+import sys
 from utils import find_reverse, random_choose, parse_response, strip_end
-from my_llm import chat_my, visualize_messages, get_chat_completion_my
+
+# ----------------------------------------------
+# Set a persistent local cache directory for Hugging Face
+HF_HOME = "/huggingface_cache"
+os.environ["HF_HOME"] = HF_HOME  # Ensure the environment variable is set
+# Create the cache directory if it doesn't exist
+os.makedirs(HF_HOME, exist_ok=True)
+# Load the LLaMA 2 model and tokenizer, using the cache
+MODEL_NAME = "meta-llama/Llama-2-7b-hf"
+tokenizer = AutoTokenizer.from_pretrained(MODEL_NAME, cache_dir=HF_HOME)
+tokenizer.add_special_tokens({"pad_token": "<PAD>"})
+model = AutoModelForCausalLM.from_pretrained(
+    MODEL_NAME, torch_dtype=torch.float16, device_map="auto", cache_dir=HF_HOME
+)
+print(f"Model and tokenizer loaded successfully. Cached at {HF_HOME}")
+# ----------------------------------------------
 
 def LTM(X, labels):
     assert len(X) == len(labels)
     return ["Query: {} | Solved: {}".format(X[i], labels[i]) for i in range(len(X))]
 
 def main(
-    model_ckpt: str = 'meta-llama/Llama-2-7b-hf',  # Updated to use LLaMA-2
+    model_ckpt: str = 'llama-2-7b-hf',
     num_episodes: int = 15,
     num_stm_slots: int = 3,
     max_turn: int = 4,
     dir_write: str = "results/",
+    rapidapi_key: str = "",
     if_visualize: bool = True,
 ):
-    # ----------------------------------------------
-    # Set a persistent local cache directory for Hugging Face
-    HF_HOME = "/huggingface_cache"
-    os.environ["HF_HOME"] = HF_HOME  # Ensure the environment variable is set
-    # Create the cache directory if it doesn't exist
-    os.makedirs(HF_HOME, exist_ok=True)
 
-    # Load the LLaMA 2 model and tokenizer, using the cache
-    from transformers import AutoTokenizer, AutoModelForCausalLM
-    import torch
+    # with open("BMTools/secret_keys.sh", "r", encoding='utf-8') as f:
+    #     env_variables = f.readlines()
+    # for var in env_variables:
+    #     if var.strip() == "":
+    #         continue
+    #     key, val = var.replace("export", "").strip().split("=")
+    #     val = val.strip("'")
+    #     os.environ[key] = val
 
-    MODEL_NAME = "meta-llama/Llama-2-7b-hf"
-    tokenizer = AutoTokenizer.from_pretrained(MODEL_NAME, cache_dir=HF_HOME)
-    tokenizer.add_special_tokens({"pad_token": "<PAD>"})
-    model = AutoModelForCausalLM.from_pretrained(
-        MODEL_NAME, torch_dtype=torch.float16, device_map="auto", cache_dir=HF_HOME
-    )
-    print(f"Model and tokenizer loaded successfully. Cached at {HF_HOME}")
-    # ----------------------------------------------
-    # Load API descriptions and list
-    with open("tool_metadata/API_descriptions.json", "r", encoding='utf-8') as f:
+    with open("STE/tool_metadata/tool2cate.json", "r", encoding='utf-8') as f:
+        tool2cate = json.load(f)
+
+    with open("STE/tool_metadata/API_descriptions.json", "r", encoding='utf-8') as f:
         API_descriptions = json.load(f)
 
-    with open("tool_metadata/API_list.json", "r", encoding='utf-8') as f:
+    with open("STE/tool_metadata/API_list.json", "r", encoding='utf-8') as f:
         API_list = json.load(f)
 
-    # Initialize Hugging Face pipeline
-    hf_pipeline = pipeline
+    # with open("STE/tool_metadata/API_dict_bmtools.json", "r", encoding='utf-8') as f:
+    #     API_dict_bmtools = json.load(f)
+
+    bm_tools_l = ['search',
+                 'disambiguation',
+                 'search_places',
+                 'getWolframAlphaResults',
+                 'get_weather_today',
+                 'forecast_weather',
+                 'get_arxiv_article_information',
+                 'get_today_date',
+                 'add_date',
+                 'search_general']
+
+    name_to_tool_map_global = dict()
+
+    # Remove bmtools code as instructed
+    # For now, we remove loading tools and run_tool function for bmtools
 
     def run_tool(full_API_name, args, truncate=2048):
-        """
-        Execute the Hugging Face pipeline API.
-        """
-        if full_API_name != "huggingface_pipeline":
-            raise ValueError("Only the 'huggingface_pipeline' API is supported.")
+        pass  # Placeholder, since bmtools and toolbench are not used
 
-        try:
-            # Parse the input arguments
-            task = args.get("task")
-            model = args.get("model", None)
-            inputs = args.get("inputs")
-            kwargs = args.get("kwargs", {})
-
-            # Initialize the pipeline
-            pipe = hf_pipeline(task, model=model)
-
-            # Execute the pipeline
-            result = pipe(inputs, **kwargs)
-
-            # Truncate the result if necessary
-            if truncate:
-                result = str(result)[:truncate]
-
-            return json.dumps(result)
-        except Exception as e:
-            return f"Error in run_tool: {str(e)}"
-
-    # Memory and reflection prompts
     PAST_Q_MSG_pre = "Below are queries you have already explored and whether you successfully solved them with the API's help:"
     PAST_Q_MSG_post = "Based on these, try to explore queries that can help you understand the API further; avoid synthesizing queries that are too close to the existing ones."
 
@@ -87,11 +89,12 @@ def main(
     data_dict = dict()
 
     for API in API_list:
+
         print("===== Currently", API, "=====")
 
         API_name_list = [API]
 
-        with open("prompts/prompt_explore.txt", "r") as f:
+        with open("/STE/prompts/prompt_explore.txt", "r") as f:
             prompt_template = f.read().strip()
 
         template_q, template_a, template_q_follow, template_a_follow = prompt_template.split("=========")
@@ -121,8 +124,10 @@ def main(
                 {"role": "system", "content": "You are a helpful assistant."}
             ]
 
-            response = chat_my(messages, prompt_q_added_question,
-                               temp=1.0, stop="Thought:", visualize=if_visualize, max_tokens=360, model=model_ckpt)[-1]['content']
+            # Using LLaMA instead of GPT
+            inputs = tokenizer(prompt_q_added_question, return_tensors="pt").to(model.device)
+            outputs = model.generate(**inputs, max_length=512, temperature=1.0, pad_token_id=tokenizer.pad_token_id)
+            response = tokenizer.decode(outputs[0], skip_special_tokens=True)
 
             messages = messages + [
                 {"role": "user", "content": prompt_q},
@@ -138,8 +143,9 @@ def main(
             explored_queries.append(query)
 
             chains = []
-            messages = chat_my(messages, prompt_a, temp=1.0, stop="Observation:", visualize=if_visualize, max_tokens=360, model=model_ckpt)
-            temp = messages[-1]['content']
+            inputs = tokenizer(prompt_a, return_tensors="pt").to(model.device)
+            outputs = model.generate(**inputs, max_length=360, temperature=1.0, pad_token_id=tokenizer.pad_token_id)
+            temp = tokenizer.decode(outputs[0], skip_special_tokens=True)
             parsed_response = parse_response(temp, API_name_list, api_descriptions)
             for _ in range(max_turn):
                 if not parsed_response['parse_successful']:
@@ -153,9 +159,9 @@ def main(
                 parsed_response['observation'] = observation
                 chains.append(parsed_response)
 
-                messages = chat_my(messages, "Observation: "+observation,
-                                   temp=1.0, stop="Observation:", visualize=if_visualize, max_tokens=360, model=model_ckpt)
-                temp = messages[-1]['content']
+                inputs = tokenizer("Observation: "+observation, return_tensors="pt").to(model.device)
+                outputs = model.generate(**inputs, max_length=360, temperature=1.0, pad_token_id=tokenizer.pad_token_id)
+                temp = tokenizer.decode(outputs[0], skip_special_tokens=True)
                 parsed_response = parse_response(temp, API_name_list, api_descriptions)
 
             if len(chains) == 0 or not chains[-1]['finish']:
@@ -163,8 +169,9 @@ def main(
 
             first_item['chains'] = chains
 
-            messages = chat_my(messages, prompt_reflection, temp=1.0, stop="Observation:", visualize=if_visualize, max_tokens=360, model=model_ckpt)
-            res = messages[-1]['content']
+            inputs = tokenizer(prompt_reflection, return_tensors="pt").to(model.device)
+            outputs = model.generate(**inputs, max_length=360, temperature=1.0, pad_token_id=tokenizer.pad_token_id)
+            res = tokenizer.decode(outputs[0], skip_special_tokens=True)
             if "No" in res:
                 successful = "No"
             else:
@@ -187,8 +194,9 @@ def main(
                 else:
                     template_q_follow_added_question = template_q_follow
 
-                response = chat_my(messages, template_q_follow_added_question,
-                                   temp=1.0, stop="Thought:", visualize=if_visualize, max_tokens=360, model=model_ckpt)[-1]['content']
+                inputs = tokenizer(template_q_follow_added_question, return_tensors="pt").to(model.device)
+                outputs = model.generate(**inputs, max_length=360, temperature=1.0, pad_token_id=tokenizer.pad_token_id)
+                response = tokenizer.decode(outputs[0], skip_special_tokens=True)
                 messages = messages + [
                     {"role": "user", "content": template_q_follow},
                     {"role": "assistant", "content": response}
@@ -199,9 +207,9 @@ def main(
                 explored_queries.append(query)
 
                 chains = []
-                messages = chat_my(messages, template_a_follow,
-                                   temp=1.0, stop="Observation:", visualize=if_visualize, max_tokens=360, model=model_ckpt)
-                temp = messages[-1]['content']
+                inputs = tokenizer(template_a_follow, return_tensors="pt").to(model.device)
+                outputs = model.generate(**inputs, max_length=360, temperature=1.0, pad_token_id=tokenizer.pad_token_id)
+                temp = tokenizer.decode(outputs[0], skip_special_tokens=True)
                 parsed_response = parse_response(temp, API_name_list, api_descriptions)
                 for _ in range(max_turn):
                     if not parsed_response['parse_successful']:
@@ -215,9 +223,9 @@ def main(
                     parsed_response['observation'] = observation
                     chains.append(parsed_response)
 
-                    messages = chat_my(messages, "Observation: "+observation,
-                                       temp=1.0, stop="Observation:", visualize=if_visualize, max_tokens=360, model=model_ckpt)
-                    temp = messages[-1]['content']
+                    inputs = tokenizer("Observation: "+observation, return_tensors="pt").to(model.device)
+                    outputs = model.generate(**inputs, max_length=360, temperature=1.0, pad_token_id=tokenizer.pad_token_id)
+                    temp = tokenizer.decode(outputs[0], skip_special_tokens=True)
                     parsed_response = parse_response(temp, API_name_list, api_descriptions)
 
                 if len(chains) == 0 or not chains[-1]['finish']:
@@ -225,9 +233,9 @@ def main(
 
                 item['chains'] = chains
 
-                messages = chat_my(messages, prompt_reflection,
-                                   temp=1.0, stop="Observation:", visualize=if_visualize, max_tokens=360, model=model_ckpt)
-                res = messages[-1]['content']
+                inputs = tokenizer(prompt_reflection, return_tensors="pt").to(model.device)
+                outputs = model.generate(**inputs, max_length=360, temperature=1.0, pad_token_id=tokenizer.pad_token_id)
+                res = tokenizer.decode(outputs[0], skip_special_tokens=True)
                 if "No" in res:
                     successful = "No"
                 else:

@@ -3,31 +3,40 @@ import torch
 from termcolor import colored
 from copy import deepcopy
 
+# Set up the Hugging Face cache directory
+HF_HOME = "/huggingface_cache"
+os.environ["HF_HOME"] = HF_HOME
+os.makedirs(HF_HOME, exist_ok=True)
+
 # Load the LLaMA 2 model and tokenizer
 MODEL_NAME = "meta-llama/Llama-2-7b-hf"
-tokenizer = AutoTokenizer.from_pretrained(MODEL_NAME)
-tokenizer.add_special_tokens(
-    {
-
-        "pad_token": "<PAD>",
-    }
+tokenizer = AutoTokenizer.from_pretrained(MODEL_NAME, cache_dir=HF_HOME)
+tokenizer.add_special_tokens({"pad_token": "<PAD>"})
+model = AutoModelForCausalLM.from_pretrained(
+    MODEL_NAME, torch_dtype=torch.float16, device_map="auto", cache_dir=HF_HOME
 )
-model = AutoModelForCausalLM.from_pretrained(MODEL_NAME, torch_dtype=torch.float16, device_map="auto")
+print(f"Model and tokenizer loaded successfully. Cached at {HF_HOME}")
 
 def get_chat_completion_my(messages, max_tokens=512, temp=0.7, return_raw=False, stop=None):
     """
     Generate a response using LLaMA 2 model.
     """
+    # Format messages for LLaMA-2
     prompt = format_messages(messages)
     inputs = tokenizer(prompt, return_tensors="pt").to(model.device)
+
+    # Generate response
     output_tokens = model.generate(
         **inputs,
         max_length=inputs.input_ids.shape[1] + max_tokens,
         temperature=temp,
-        do_sample=True
+        do_sample=True,
+        pad_token_id=tokenizer.pad_token_id,
     )
+
+    # Decode the response
     response = tokenizer.decode(output_tokens[0], skip_special_tokens=True)
-    response = response[len(prompt):].strip()
+    response = response[len(prompt):].strip()  # Remove the prompt from the response
 
     # Apply stop condition
     if stop and stop in response:
@@ -61,15 +70,10 @@ def visualize_messages(messages):
         else:
             print(colored("<no content>", role2color[entry['role']]))
 
-<<<<<<< HEAD
 def chat_my(messages, new_message, visualize=True, **params):
     """
-    Handles user input and model response, maintaining a message history.
+    Chat with the LLaMA 2 model.
     """
-=======
-
-def chat_my(messages, new_message, visualize=True, **params):
->>>>>>> b46a1e748fc03d9e56cb7fd48bfc3e09d97b9799
     messages = deepcopy(messages)
     messages.append({"role": "user", "content": new_message})
     response = get_chat_completion_my(messages, **params)
