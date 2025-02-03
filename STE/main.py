@@ -37,7 +37,7 @@ def main(
 
     MODEL_NAME = "meta-llama/Llama-2-7b-hf"
     print("DEBUG: Initializing tokenizer from MODEL_NAME.")
-    tokenizer = AutoTokenizer.from_pretrained(MODEL_NAME, cache_dir=HF_HOME)
+    tokenizer = AutoTokenizer.from_pretrained(MODEL_NAME, cache_dir=HF_HOME, max_length=4096)
     tokenizer.add_special_tokens({"pad_token": "<PAD>"})
     print("DEBUG: Initializing model from MODEL_NAME.")
     model = AutoModelForCausalLM.from_pretrained(

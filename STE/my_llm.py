@@ -30,7 +30,17 @@ def get_chat_completion_my(messages, model=None, max_tokens=512, temp=0.7, retur
     # Format messages for LLaMA-2
     prompt = format_messages(messages)
     inputs = tokenizer(prompt, return_tensors="pt").to(model.device)
-
+    token_ids = inputs.input_ids[0].tolist()
+    print("DEBUG: Prompt length (tokens):", len(token_ids))
+    
+    # TODO TEST THIS CODE 
+    max_context_length = tokenizer.model_max_length  # or your model's limit
+    if inputs.input_ids.shape[1] > max_context_length:
+        # Remove older messages (or summarize them)
+        # Example: keep only the last N tokens
+        inputs.input_ids = inputs.input_ids[:, -max_context_length:]
+    # TODO TEST THIS CODE 
+    
     # Generate response
     output_tokens = model.generate(
         **inputs,
@@ -72,7 +82,9 @@ def visualize_messages(messages):
     for entry in messages:
         assert entry['role'] in role2color.keys()
         if entry['content'].strip() != "":
+            print("GENERATED RESPONSE BEGINS: ----------------------")
             print(colored(entry['content'], role2color[entry['role']]))
+            print("GENERATED RESPONSE ENDS: ----------------------")
         else:
             print(colored("<no content>", role2color[entry['role']]))
 
