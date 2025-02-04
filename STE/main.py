@@ -18,7 +18,7 @@ def LTM(X, labels):
     return ["Query: {} | Solved: {}".format(X[i], labels[i]) for i in range(len(X))]
 
 def main(
-    model_ckpt: str = 'meta-llama/Llama-2-7b-hf',  # Updated to use LLaMA-2
+    model_ckpt: str = 'meta-llama/Meta-Llama-3-8B-Instruct',  # Updated to use LLaMA-2
     num_episodes: int = 15,
     num_stm_slots: int = 3,
     max_turn: int = 4,
@@ -35,7 +35,7 @@ def main(
     # Create the cache directory if it doesn't exist
     os.makedirs(HF_HOME, exist_ok=True)
 
-    MODEL_NAME = "meta-llama/Llama-2-7b-hf"
+    MODEL_NAME = "meta-llama/Meta-Llama-3-8B-Instruct"
     print("DEBUG: Initializing tokenizer from MODEL_NAME.")
     tokenizer = AutoTokenizer.from_pretrained(MODEL_NAME, cache_dir=HF_HOME, max_length=4096)
     tokenizer.add_special_tokens({"pad_token": "<PAD>"})
@@ -68,14 +68,18 @@ def main(
 
         try:
             # Parse the input arguments
+            print("DEBUG: RETRIEVING TASK")
             task = args.get("task")
+            print("DEBUG: RETRIEVING MODEL")
             model = args.get("model", None)
+            print("DEBUG: RETRIEVING INPUTS")
             inputs = args.get("inputs")
+            print("DEBUG: RETRIEVING KWARGS")
             kwargs = args.get("kwargs", {})
 
             # Initialize the pipeline
             print("DEBUG: Initializing pipeline with task:", task, "model:", model)
-            pipe = hf_pipeline(task, model=model)
+            pipe = hf_pipeline(task, model=model_ckpt)
 
             # Execute the pipeline
             print("DEBUG: Executing pipeline call.")

@@ -43,8 +43,11 @@ def parse_response(response, API_name_list, api_descriptions,
     item['finish'] = False
     if "Action Input:" not in response:
         item['parse_successful'] = False
-        item[
-            'parse_error_msg'] = "If you have already got enough information for the final answer, say \"Final Answer:\" followed by your answer. Otherwise, please specify your API call via \"Action:\" and API arguments via \"Action Input:\" followed by a json string. If there are no arguments, use \"Action Input: {}\". Do NOT start your response with \"Observation:\"; there is no need to repeat it."
+        item['parse_error_msg'] = ("If you have already got enough information for the final answer, say "
+                                   "\"Final Answer:\" followed by your answer. Otherwise, please specify your API call via "
+                                   "\"Action:\" and API arguments via \"Action Input:\" followed by a json string. "
+                                   "If there are no arguments, use \"Action Input: {}\". Do NOT start your response with "
+                                   "\"Observation:\"; there is no need to repeat it.")
         return item
 
     if response.count("Action Input:") > 1:
@@ -53,14 +56,19 @@ def parse_response(response, API_name_list, api_descriptions,
         return item
 
     action, action_input = response.split("Action Input:")
+    print("DEBUG: Raw ACTION INPUT extracted:", action_input)
+    print("DEBUG: Raw ACTION INPUT type:", type(action_input))
     action, action_input = strip_end(action.strip(), "\\n").strip(), strip_end(action_input.strip(), "\\n").strip()
+    print("DEBUG: After strip_end, ACTION INPUT:", action_input)
+    print("DEBUG: After strip_end, ACTION INPUT type:", type(action_input))
 
     # get action
     if "Action:" not in action:
         item['parse_successful'] = False
-        item[
-            'parse_error_msg'] = "Please specify the API name you would like to call via \"Action:\" followed by the name. Remember that you should only call one API at a time, and the API name should be one of the following: {}. If you have already got the final answer, say \"Final Answer:\" followed by your final answer.".format(
-            ", ".join(API_name_list))
+        item['parse_error_msg'] = ("Please specify the API name you would like to call via \"Action:\" followed by the name. "
+                                   "Remember that you should only call one API at a time, and the API name should be one of the following: {}. "
+                                   "If you have already got the final answer, say \"Final Answer:\" followed by your final answer.").format(
+                                    ", ".join(API_name_list))
         return item
 
     if action.count("Action:") > 1:
@@ -75,7 +83,6 @@ def parse_response(response, API_name_list, api_descriptions,
         action = action.replace("<tool_", "").strip("<>")
 
     if check_API_name and (action not in API_name_list):
-
         if ground_API:
             # find the closest API that is supported
             action = get_close_matches(action, API_name_list, n=1, cutoff=0.001)[0]
@@ -107,8 +114,7 @@ def parse_response(response, API_name_list, api_descriptions,
     right_bracket_pos = find_reverse(action_input, '}')
     if right_bracket_pos == -1:
         item['parse_successful'] = False
-        item[
-            'parse_error_msg'] = "the Action Input is in json string format, and should end with \"}\". Do NOT say anything else after \"}\""
+        item['parse_error_msg'] = "the Action Input is in json string format, and should end with \"}\". Do NOT say anything else after \"}\""
         return item
 
     if left_bracket_pos >= right_bracket_pos:
@@ -118,29 +124,40 @@ def parse_response(response, API_name_list, api_descriptions,
 
     # keep only within {}
     action_input = action_input[left_bracket_pos: right_bracket_pos + 1]
+    print("DEBUG: ACTION INPUT after slicing:", action_input)
     action_input = "{" + action_input.strip("{}") + "}"
-
+    print("DEBUG: ACTION INPUT after re-adding braces:", action_input)
     if action_input.startswith("{{"):
         item['parse_successful'] = False
-        item[
-            'parse_error_msg'] = "the Action Input is in json string format, and should begin with only one \"{\", not two or more."
+        item['parse_error_msg'] = "the Action Input is in json string format, and should begin with only one \"{\", not two or more."
         return item
     if action_input.endswith("}}"):
         item['parse_successful'] = False
-        item[
-            'parse_error_msg'] = "the Action Input is in json string format, and should end with only one \"}\". Do NOT say anything else after \"}\""
+        item['parse_error_msg'] = "the Action Input is in json string format, and should end with only one \"}\". Do NOT say anything else after \"}\""
         return item
 
     action_input = action_input.strip()
+    print("DEBUG: Final ACTION INPUT string:", action_input)
+    print("DEBUG: Final ACTION INPUT type before JSON conversion:", type(action_input))
+
+    # **NEW CODE: Convert the JSON string into a Python dictionary**
+    try:
+        action_input_obj = json.loads(action_input)
+    except Exception as e:
+        item['parse_successful'] = False
+        item['parse_error_msg'] = "Error parsing JSON in Action Input: " + str(e)
+        return item
+
+    print("DEBUG: ACTION INPUT object after JSON conversion:", action_input_obj)
+    print("DEBUG: ACTION INPUT type after JSON conversion:", type(action_input_obj))
 
     item['parse_successful'] = True
     if proc_thought:
         item['thought'] = thought
     item['action'] = action
-    item['action_input'] = action_input
+    item['action_input'] = action_input_obj
     return item
 
 
 if __name__ == '__main__':
     print()
-
