@@ -11,6 +11,7 @@ from my_llm import chat_my, visualize_messages, get_chat_completion_my, set_toke
 from transformers import AutoTokenizer, AutoModelForCausalLM
 import torch
 from datetime import datetime  # For generating dynamic filenames
+import evaluate
 
 def LTM(X, labels):
     print("DEBUG: Calling LTM function.")
@@ -58,40 +59,64 @@ def main(
     # Initialize Hugging Face pipeline
     hf_pipeline = pipeline
 
-    def run_tool(full_API_name, args, truncate=2048):
-        print("DEBUG: Entering run_tool function with full_API_name:", full_API_name)
-        """
-        Execute the Hugging Face pipeline API.
-        """
-        if full_API_name != "huggingface_pipeline":
-            raise ValueError("Only the 'huggingface_pipeline' API is supported.")
+    # def run_tool(full_API_name, args, truncate=2048):
+    #     print("DEBUG: Entering run_tool function with full_API_name:", full_API_name)
+    #     """
+    #     Execute the Hugging Face pipeline API.
+    #     """
+    #     if full_API_name != "huggingface_pipeline":
+    #         raise ValueError("Only the 'huggingface_pipeline' API is supported.")
 
+    #     try:
+    #         # Parse the input arguments
+    #         print("DEBUG: RETRIEVING TASK")
+    #         task = args.get("task")
+    #         print("DEBUG: RETRIEVING MODEL")
+    #         model = args.get("model", None)
+    #         print("DEBUG: RETRIEVING INPUTS")
+    #         inputs = args.get("inputs")
+    #         print("DEBUG: RETRIEVING KWARGS")
+    #         kwargs = args.get("kwargs", {})
+
+    #         # Initialize the pipeline
+    #         print("DEBUG: Initializing pipeline with task:", task, "model:", model)
+    #         pipe = hf_pipeline(task, model=model_ckpt)
+
+    #         # Execute the pipeline
+    #         print("DEBUG: Executing pipeline call.")
+    #         result = pipe(inputs, **kwargs)
+
+    #         # Truncate the result if necessary
+    #         if truncate:
+    #             result = str(result)[:truncate]
+
+    #         return json.dumps(result)
+    #     except Exception as e:
+    #         return f"Error in run_tool: {str(e)}"
+    
+
+
+    def run_evaluation(metric_name, args, truncate=2048):
+        """
+        Execute an evaluation metric from Hugging Face evaluate.
+        """
+        # Check that the metric is in our list (API_list)
+        if metric_name not in API_list:
+            raise ValueError(f"Metric '{metric_name}' is not supported. Supported metrics are: {API_list}")
+        
         try:
-            # Parse the input arguments
-            print("DEBUG: RETRIEVING TASK")
-            task = args.get("task")
-            print("DEBUG: RETRIEVING MODEL")
-            model = args.get("model", None)
-            print("DEBUG: RETRIEVING INPUTS")
-            inputs = args.get("inputs")
-            print("DEBUG: RETRIEVING KWARGS")
-            kwargs = args.get("kwargs", {})
-
-            # Initialize the pipeline
-            print("DEBUG: Initializing pipeline with task:", task, "model:", model)
-            pipe = hf_pipeline(task, model=model_ckpt)
-
-            # Execute the pipeline
-            print("DEBUG: Executing pipeline call.")
-            result = pipe(inputs, **kwargs)
-
-            # Truncate the result if necessary
+            # Load the metric (this uses the default/cached model/tokenizer as defined in the metric's implementation)
+            metric = evaluate.load(metric_name)
+            # Compute the metric using the provided arguments.
+            result = metric.compute(**args)
+            
+            # Optionally, truncate the stringified result
+            result_str = json.dumps(result)
             if truncate:
-                result = str(result)[:truncate]
-
-            return json.dumps(result)
+                result_str = result_str[:truncate]
+            return result_str
         except Exception as e:
-            return f"Error in run_tool: {str(e)}"
+            return f"Error in run_evaluation: {str(e)}"
 
     # Memory and reflection prompts
     PAST_Q_MSG_pre = "Below are queries you have already explored and whether you successfully solved them with the API's help:"
@@ -168,7 +193,7 @@ def main(
                         chains.append(parsed_response)
                         break
                     else:
-                        observation = run_tool(parsed_response['action'], parsed_response['action_input'])
+                        observation = run_evaluation(parsed_response['action'], parsed_response['action_input'])
                 parsed_response['observation'] = observation
                 chains.append(parsed_response)
 
@@ -233,7 +258,7 @@ def main(
                             chains.append(parsed_response)
                             break
                         else:
-                            observation = run_tool(parsed_response['action'], parsed_response['action_input'])
+                            observation = run_evaluation(parsed_response['action'], parsed_response['action_input'])
                     parsed_response['observation'] = observation
                     chains.append(parsed_response)
 

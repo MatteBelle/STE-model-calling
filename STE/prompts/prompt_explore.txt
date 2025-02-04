@@ -1,56 +1,65 @@
-Your task is to answer the user's query as best you can. You have access to the following tools which you can use via API call to help with your response:
+Your task is to answer the user's query as best you can. You have access to the following evaluation metrics (tools) which you can use via function calls to help with your response:
 
 {api_descriptions}
 
-Now you have the chance to explore the available APIs. This involves:
-1) Synthesizing a natural user query that an API call could help answer. Be specific and include necessary details—for example, if the user wants sentiment analysis, include the text to be analyzed; if text generation is required, include a clear prompt; if question-answering is needed, include context and the question.
-2) Responding to the user query with the help of the APIs, focusing on queries that require only a single API call.
+Now you have the chance to explore the available metrics. This involves:
+1) Synthesizing a natural user query that could benefit from evaluation. Be specific and include necessary details—for example, if the task is to compare summaries, include both a generated summary and its reference; if evaluating translation quality, include both the candidate and reference translations.
+2) Responding to the user query using the evaluation metrics, focusing on queries that can be addressed with a single metric call.
 
-Start by inputting your synthesized user query. Make the query as natural as possible without using the provided API descriptions or API names directly (since the user does not know what tools you have). Input just the user query alone; do NOT solve the query for now.
+Start by inputting your synthesized user query. Make the query as natural as possible without using the provided metric descriptions or metric names directly (since the user does not know what evaluation tools you have). Input just the user query alone; do NOT solve the query for now.
 
 User Query:
 
 =========
 
-Now, try to respond to the query using the available APIs.
+Now, try to respond to the query using the available evaluation metrics.
 
-The format you use the API is by specifying 1) Action: the API function name you'd like to call 2) Action Input: the input parameters of the API call in a json string format. The result of the API call will be returned starting with "Observation:". Remember that you should only perform a SINGLE action at a time, do NOT return a list of multiple actions.
+The format you use for the metric call is by specifying: 
+1) Action: the evaluation metric name you would like to use  
+2) Action Input: the input parameters for the metric call in a JSON string format. The result of the evaluation call will be returned starting with "Observation:". Remember that you should only perform a SINGLE action at a time; do NOT return a list of multiple actions.
 
 Reminder:
-1) the only values that should follow "Action:" are: {api_names}
-2) use the following json string format for the API arguments:
+1) The only values that should follow "Action:" are: {api_names}
+2) Use the following JSON string format for the evaluation arguments:
 
 Action Input:
 {{
-    "task": "value_1",  // e.g., "text-generation", "sentiment-analysis", "question-answering"
-    "model": "value_2", // e.g., "llama-2-7b-hf" is default and should not be changed
-    "inputs": "value_3", // e.g., "Once upon a time, there was a dragon."
+    "predictions": "Once upon a time there was a hero...",
+    "references": "Once upon a time, there was a hero.",
     "kwargs": {{
-        "key_1": "value_4", // e.g., "max_length": 100, "temperature": 0.7
+        "key_1": "value_1" // optional parameters relative to the metric given in the descriptions above
         ...
     }}
 }}
 
 Remember to ALWAYS use the following format:
 
-Thought: you should always think about what to do next
-Action: the API function name
-Action Input: the input parameters of the API call in json string format
-Observation: the return result of the API call. This is what I will provide you with; you do not need to repeat it in your response.
-... (this Thought/Action/Action Input/Observation can repeat N times)
-Thought: I now know the final answer
+Thought: you should always think about what to do next  
+Action: the evaluation metric name  
+Action Input: the input parameters for the metric call in JSON string format  
+Observation: the return result of the evaluation call. This is what I will provide you with; you do not need to repeat it in your response.  
+... (this Thought/Action/Action Input/Observation cycle can repeat N times)  
+Thought: I now know the final answer  
 Final Answer: the response to the user query
 
-Begin! Remember that your response should never start with "Observation:" since that is what I will provide you with. Once you have enough information, please immediately use \nThought: I now know the final answer\nFinal Answer:
+Begin! Remember that your response should never start with "Observation:" since that is what I will provide you with. Once you have enough information, please immediately use 
+
+\nThought: I now know the final answer\nFinal Answer:
 
 User Query (the same you just synthesized): {query}
 
 =========
 
-Now you know a bit more about the API. You can synthesize another user query to explore the API a bit further and consolidate your understanding of the API, based on things that you discovered about this API. Again, just input the user query alone; do NOT solve the query for now.
+Now you know a bit more about the available evaluation metrics. You can synthesize another user query to explore the metrics further and consolidate your understanding based on what you discovered. Again, just input the user query alone; do NOT solve the query for now.
 
 User Query:
 
 =========
 
-Now try to solve the query using the API. Remember to follow the same format, i.e,\nThought:\nAction:\nAction Input:\nObservation:\nFinal Answer:\n.
+Now try to solve the query using the evaluation metrics. Remember to follow the same format, i.e.,
+
+Thought:  
+Action:  
+Action Input:  
+Observation:  
+Final Answer:
