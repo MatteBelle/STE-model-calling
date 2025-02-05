@@ -86,7 +86,9 @@ def visualize_messages(messages):
             print(colored(entry['content'], role2color[entry['role']]))
             print("GENERATED RESPONSE ENDS: ----------------------")
         else:
+            print("GENERATED RESPONSE BEGINS: ----------------------")
             print(colored("<no content>", role2color[entry['role']]))
+            print("GENERATED RESPONSE ENDS: ----------------------")
 
 def chat_my(messages, new_message, visualize=True, **params):
     """

@@ -18,6 +18,69 @@ def LTM(X, labels):
     assert len(X) == len(labels)
     return ["Query: {} | Solved: {}".format(X[i], labels[i]) for i in range(len(X))]
 
+def normalize_evaluation_args(metric_name, args, API_descriptions):
+    """
+    Normalize and coerce the evaluation inputs so that they match the expected types.
+    This function uses the metadata for the given metric (from API_descriptions)
+    to determine expected types for each parameter.
+    """
+    try:
+        # Load metadata for the metric (the value is a JSON string)
+        metric_meta = json.loads(API_descriptions[metric_name])
+    except Exception as e:
+        print(f"DEBUG: Error loading metadata for {metric_name}: {e}")
+        metric_meta = {}
+    normalized_args = {}
+    # Get a list of expected parameters from required and optional parameters.
+    param_list = metric_meta.get("required_parameters", []) + metric_meta.get("optional_parameters", [])
+    # Build a mapping: parameter name -> expected type (as lower-case string)
+    expected_types = {}
+    for param in param_list:
+        expected_types[param["name"]] = param["type"].lower()
+
+    for key, value in args.items():
+        exp_type = expected_types.get(key, None)
+        if exp_type is None:
+            # If we do not have a type specification, leave the value as is.
+            normalized_args[key] = value
+        else:
+            try:
+                if exp_type.startswith("list"):
+                    # Expected a list. If not a list, try to split or wrap it.
+                    if not isinstance(value, list):
+                        if isinstance(value, str):
+                            # Split by comma, then strip whitespace.
+                            normalized_args[key] = [item.strip() for item in value.split(",") if item.strip()]
+                        else:
+                            normalized_args[key] = [value]
+                    else:
+                        normalized_args[key] = value
+                elif exp_type == "boolean":
+                    # Convert string representations to boolean.
+                    if isinstance(value, str):
+                        normalized_args[key] = True if value.lower() in ["true", "1", "yes"] else False
+                    else:
+                        normalized_args[key] = bool(value)
+                elif exp_type == "number":
+                    # Attempt to convert to integer or float.
+                    # (Here we check if there's a dot in the string representation.)
+                    if isinstance(value, (int, float)):
+                        normalized_args[key] = value
+                    else:
+                        str_val = str(value)
+                        if "." in str_val:
+                            normalized_args[key] = float(str_val)
+                        else:
+                            normalized_args[key] = int(str_val)
+                elif exp_type == "string":
+                    normalized_args[key] = str(value)
+                else:
+                    normalized_args[key] = value
+            except Exception as e:
+                print(f"DEBUG: Error normalizing parameter '{key}' with value '{value}': {e}")
+                normalized_args[key] = value
+    return normalized_args
+
 def main(
     model_ckpt: str = 'meta-llama/Meta-Llama-3-8B-Instruct',  # Updated to use LLaMA-2
     num_episodes: int = 15,
@@ -47,6 +110,7 @@ def main(
     print(f"Model and tokenizer loaded successfully. Cached at {HF_HOME}")
     # ----------------------------------------------
     # Set the global tokenizer to avoid duplicate loading
+    from my_llm import set_tokenizer
     set_tokenizer(tokenizer)
     
     print("DEBUG: Loading API descriptions and API list from JSON files.")
@@ -56,72 +120,36 @@ def main(
     with open("STE/tool_metadata/API_list.json", "r", encoding='utf-8') as f:
         API_list = json.load(f)
 
-    # Initialize Hugging Face pipeline
-    hf_pipeline = pipeline
-
-    # def run_tool(full_API_name, args, truncate=2048):
-    #     print("DEBUG: Entering run_tool function with full_API_name:", full_API_name)
-    #     """
-    #     Execute the Hugging Face pipeline API.
-    #     """
-    #     if full_API_name != "huggingface_pipeline":
-    #         raise ValueError("Only the 'huggingface_pipeline' API is supported.")
-
-    #     try:
-    #         # Parse the input arguments
-    #         print("DEBUG: RETRIEVING TASK")
-    #         task = args.get("task")
-    #         print("DEBUG: RETRIEVING MODEL")
-    #         model = args.get("model", None)
-    #         print("DEBUG: RETRIEVING INPUTS")
-    #         inputs = args.get("inputs")
-    #         print("DEBUG: RETRIEVING KWARGS")
-    #         kwargs = args.get("kwargs", {})
-
-    #         # Initialize the pipeline
-    #         print("DEBUG: Initializing pipeline with task:", task, "model:", model)
-    #         pipe = hf_pipeline(task, model=model_ckpt)
-
-    #         # Execute the pipeline
-    #         print("DEBUG: Executing pipeline call.")
-    #         result = pipe(inputs, **kwargs)
-
-    #         # Truncate the result if necessary
-    #         if truncate:
-    #             result = str(result)[:truncate]
-
-    #         return json.dumps(result)
-    #     except Exception as e:
-    #         return f"Error in run_tool: {str(e)}"
-    
-
+    # (The unused hf_pipeline variable has been removed.)
 
     def run_evaluation(metric_name, args, truncate=2048):
         """
         Execute an evaluation metric from Hugging Face evaluate.
         """
-        # Check that the metric is in our list (API_list)
         if metric_name not in API_list:
             raise ValueError(f"Metric '{metric_name}' is not supported. Supported metrics are: {API_list}")
         
         try:
+            # Normalize the input arguments using the metadata.
+            normalized_args = normalize_evaluation_args(metric_name, args, API_descriptions)
             # Load the metric (this uses the default/cached model/tokenizer as defined in the metric's implementation)
             metric = evaluate.load(metric_name)
-            # Compute the metric using the provided arguments.
-            result = metric.compute(**args)
+            # Compute the metric using the normalized arguments.
+            result = metric.compute(**normalized_args)
             
-            # Optionally, truncate the stringified result
+            print("DEBUG: EVALUATION RESULT = " + str(result))
             result_str = json.dumps(result)
+            print("DEBUG: EVALUATION RESULT JSONED = " + str(result_str))
             if truncate:
                 result_str = result_str[:truncate]
             return result_str
         except Exception as e:
+            print("DEBUG ERROR IN EVALUATION: " + str(e))
             return f"Error in run_evaluation: {str(e)}"
 
-    # Memory and reflection prompts
+    # Memory and reflection prompts (unchanged)
     PAST_Q_MSG_pre = "Below are queries you have already explored and whether you successfully solved them with the API's help:"
     PAST_Q_MSG_post = "Based on these, try to explore queries that can help you understand the API further; avoid synthesizing queries that are too close to the existing ones."
-
     prompt_reflection = "Do you think you successfully fulfilled this query in the end? Respond with \"Yes\" or \"No\"."
 
     print("DEBUG: Ensuring output directory exists.")
@@ -145,9 +173,9 @@ def main(
             print("DEBUG: Starting episode:", session_id)
             item_list = []
             first_item = dict()
-            api_descriptions = "\n\n".join(["API_name: {}\nDescription: {}".format(temp, API_descriptions[temp]) for temp in API_name_list])
+            api_descriptions_text = "\n\n".join(["API_name: {}\nDescription: {}".format(temp, API_descriptions[temp]) for temp in API_name_list])
             prompt_q = template_q.format(
-                api_descriptions=api_descriptions,
+                api_descriptions=api_descriptions_text,
             )
 
             if len(explored_queries) > 0:
@@ -184,7 +212,7 @@ def main(
             print("DEBUG: Processing chain of calls for the first query.")
             messages = chat_my(messages, prompt_a, temp=1.0, stop="Observation:", visualize=if_visualize, max_tokens=360, model=model)
             temp = messages[-1]['content']
-            parsed_response = parse_response(temp, API_name_list, api_descriptions)
+            parsed_response = parse_response(temp, API_name_list, API_descriptions)
             for _ in range(max_turn):
                 if not parsed_response['parse_successful']:
                     observation = parsed_response['parse_error_msg']
@@ -200,7 +228,7 @@ def main(
                 messages = chat_my(messages, "Observation: "+observation,
                                    temp=1.0, stop="Observation:", visualize=if_visualize, max_tokens=360, model=model)
                 temp = messages[-1]['content']
-                parsed_response = parse_response(temp, API_name_list, api_descriptions)
+                parsed_response = parse_response(temp, API_name_list, API_descriptions)
 
             if len(chains) == 0 or not chains[-1]['finish']:
                 chains.append(parsed_response)
@@ -249,7 +277,7 @@ def main(
                 messages = chat_my(messages, template_a_follow,
                                    temp=1.0, stop="Observation:", visualize=if_visualize, max_tokens=360, model=model)
                 temp = messages[-1]['content']
-                parsed_response = parse_response(temp, API_name_list, api_descriptions)
+                parsed_response = parse_response(temp, API_name_list, API_descriptions)
                 for _ in range(max_turn):
                     if not parsed_response['parse_successful']:
                         observation = parsed_response['parse_error_msg']
@@ -265,7 +293,7 @@ def main(
                     messages = chat_my(messages, "Observation: "+observation,
                                        temp=1.0, stop="Observation:", visualize=if_visualize, max_tokens=360, model=model)
                     temp = messages[-1]['content']
-                    parsed_response = parse_response(temp, API_name_list, api_descriptions)
+                    parsed_response = parse_response(temp, API_name_list, API_descriptions)
 
                 if len(chains) == 0 or not chains[-1]['finish']:
                     chains.append(parsed_response)
@@ -297,7 +325,6 @@ def main(
             partial_filename = os.path.join(dir_write, f"intermediate_{API}_session_{session_id}_{timestamp}.json")
             try:
                 with open(partial_filename, "w", encoding='utf-8') as f:
-                    # Here we store the sessions accumulated so far for this API
                     json.dump({
                         "API": API,
                         "session_id": session_id,
@@ -310,7 +337,7 @@ def main(
         data_dict[API] = all_sessions
 
     print("DEBUG: Writing final data_dict to JSON file.")
-    final_data_path = os.path.join(dir_write, "data_dict.json")
+    final_data_path = os.path.join(dir_write, f"data_dict_{timestamp}.json")
     with open(final_data_path, "w", encoding='utf-8') as f:
         json.dump(data_dict, f)
     print(f"DEBUG: Final data saved to {final_data_path}")
