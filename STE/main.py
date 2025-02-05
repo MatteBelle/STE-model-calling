@@ -306,7 +306,8 @@ def main(
                     temp = messages[-1]['content']
                     parsed_response = parse_response(temp, API_name_list, API_descriptions)
 
-                if len(chains) == 0 or not chains[-1]['finish']:
+                if len(chains) == 0 or not chains[-1]['
+                                                      ']:
                     chains.append(parsed_response)
 
                 item['chains'] = chains
