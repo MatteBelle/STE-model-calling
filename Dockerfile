@@ -81,7 +81,7 @@ RUN pip3 install --no-cache-dir -r requirements.txt
 ENV HF_HOME="/root/.cache/huggingface"
 
 # Install dependencies
-RUN pip install --no-cache-dir transformers torch accelerate
+RUN pip3 install --no-cache-dir transformers torch accelerate==0.26.0 evaluate nltk absl-py rouge-score sacrebleu torch transformers numpy scipy scikit-learn bert_score
 
 # Back to default frontend
 ENV DEBIAN_FRONTEND=dialog
