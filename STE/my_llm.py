@@ -91,9 +91,6 @@ def visualize_messages(messages):
             print("GENERATED RESPONSE ENDS: ----------------------")
 
 def chat_my(messages, new_message, visualize=True, **params):
-    """
-    Chat with the LLaMA 2 model.
-    """
     messages = deepcopy(messages)
     messages.append({"role": "user", "content": new_message})
     response = get_chat_completion_my(messages, **params)

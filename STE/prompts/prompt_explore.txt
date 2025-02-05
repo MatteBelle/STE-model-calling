@@ -36,7 +36,7 @@ Remember to ALWAYS use the following format:
 
 Thought: you should always think about what to do next  
 Action: the evaluation metric name  
-Action Input: the input parameters for the metric call in JSON string format  
+Action Input: the input parameters for the metric call in JSON string format, remember that you have to provide the text input by generating it yourself.
 Observation: the return result of the evaluation call. This is what I will provide you with; you do not need to repeat it in your response.  
 ... (this Thought/Action/Action Input/Observation cycle can repeat N times)  
 Thought: I now know the final answer  

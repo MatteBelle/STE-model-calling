@@ -130,7 +130,7 @@ def main(
 
     # (The unused hf_pipeline variable has been removed.)
 
-    def run_evaluation(metric_name, args, truncate=2048):
+    def run_evaluation(metric_name, args, truncate=False):
         """
         Execute an evaluation metric from Hugging Face evaluate.
         """
