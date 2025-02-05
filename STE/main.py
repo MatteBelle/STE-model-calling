@@ -24,22 +24,30 @@ def normalize_evaluation_args(metric_name, args, API_descriptions):
     This function uses the metadata for the given metric (from API_descriptions)
     to determine expected types for each parameter.
     """
+
     try:
         # Load metadata for the metric (the value is a JSON string)
         metric_meta = json.loads(API_descriptions[metric_name])
     except Exception as e:
         print(f"DEBUG: Error loading metadata for {metric_name}: {e}")
         metric_meta = {}
+
     normalized_args = {}
+
+    # Merge "kwargs" into the main args dictionary if present
+    if "kwargs" in args and isinstance(args["kwargs"], dict):
+        print("DEBUG: Expanding 'kwargs' into args.")
+        args.update(args.pop("kwargs"))
+
     # Get a list of expected parameters from required and optional parameters.
     param_list = metric_meta.get("required_parameters", []) + metric_meta.get("optional_parameters", [])
+
     # Build a mapping: parameter name -> expected type (as lower-case string)
-    expected_types = {}
-    for param in param_list:
-        expected_types[param["name"]] = param["type"].lower()
+    expected_types = {param["name"]: param["type"].lower() for param in param_list}
 
     for key, value in args.items():
         exp_type = expected_types.get(key, None)
+
         if exp_type is None:
             # If we do not have a type specification, leave the value as is.
             normalized_args[key] = value
@@ -63,7 +71,6 @@ def normalize_evaluation_args(metric_name, args, API_descriptions):
                         normalized_args[key] = bool(value)
                 elif exp_type == "number":
                     # Attempt to convert to integer or float.
-                    # (Here we check if there's a dot in the string representation.)
                     if isinstance(value, (int, float)):
                         normalized_args[key] = value
                     else:
@@ -79,6 +86,7 @@ def normalize_evaluation_args(metric_name, args, API_descriptions):
             except Exception as e:
                 print(f"DEBUG: Error normalizing parameter '{key}' with value '{value}': {e}")
                 normalized_args[key] = value
+
     return normalized_args
 
 def main(
