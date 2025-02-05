@@ -1,0 +1,34 @@
+{
+    "1": {
+      "name": "ngram_overlap",
+      "metrics": ["rouge", "bleu"]
+    },
+    "2": {
+      "name": "embedding_similarity",
+      "metrics": ["bertscore", "bartscore"]
+    },
+    "3": {
+      "name": "combined_generation",
+      "metrics": ["rouge", "bleu", "bertscore"]
+    },
+    "4": {
+      "name": "detailed_generation",
+      "metrics": ["rouge", "bleu", "bertscore", "bartscore"]
+    },
+    "5": {
+      "name": "classification_exact",
+      "metrics": ["exact_match", "recall", "f1"]
+    },
+    "6": {
+      "name": "basic_classification",
+      "metrics": ["accuracy", "f1"]
+    },
+    "7": {
+      "name": "numeric_uncertainty",
+      "metrics": ["perplexity", "mse"]
+    },
+    "8": {
+      "name": "minimal_text_quality",
+      "metrics": ["rouge", "bertscore"]
+    }
+  }

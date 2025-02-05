@@ -131,20 +131,23 @@ def main(
         
         try:
             # Normalize the input arguments using the metadata.
+            print(f"DEBUG: Normalizing evaluation arguments for metric '{metric_name}'")
+            print(f"DEBUG: Arguments before normalization: {args}")
             normalized_args = normalize_evaluation_args(metric_name, args, API_descriptions)
+            print("DEBUG: EVALUATIONEVALUATIONEVALUATIONEVALUATION: NORMALIZED ARGS = " + str(normalized_args))
             # Load the metric (this uses the default/cached model/tokenizer as defined in the metric's implementation)
             metric = evaluate.load(metric_name)
             # Compute the metric using the normalized arguments.
             result = metric.compute(**normalized_args)
             
-            print("DEBUG: EVALUATION RESULT = " + str(result))
+            print("DEBUG: EVALUATIONEVALUATIONEVALUATIONEVALUATION RESULT = " + str(result))
             result_str = json.dumps(result)
-            print("DEBUG: EVALUATION RESULT JSONED = " + str(result_str))
+            print("DEBUG: EVALUATIONEVALUATIONEVALUATIONEVALUATION RESULT JSONED = " + str(result_str))
             if truncate:
                 result_str = result_str[:truncate]
             return result_str
         except Exception as e:
-            print("DEBUG ERROR IN EVALUATION: " + str(e))
+            print("DEBUG ERROR IN EVALUATIONEVALUATIONEVALUATIONEVALUATION: " + str(e))
             return f"Error in run_evaluation: {str(e)}"
 
     # Memory and reflection prompts (unchanged)
