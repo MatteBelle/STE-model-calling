@@ -2,11 +2,9 @@
     "rouge",
     "bleu",
     "bertscore",
-    "bartscore",
     "perplexity",
     "accuracy",
     "exact_match",
     "recall",
-    "mse",
     "f1"
   ]

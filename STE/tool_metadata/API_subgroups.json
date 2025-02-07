@@ -5,15 +5,15 @@
     },
     "2": {
       "name": "embedding_similarity",
-      "metrics": ["bertscore", "bartscore"]
+      "metrics": ["rouge", "bertscore"]
     },
     "3": {
       "name": "combined_generation",
-      "metrics": ["rouge", "bleu", "bertscore"]
+      "metrics": ["bleu", "bertscore"]
     },
     "4": {
       "name": "detailed_generation",
-      "metrics": ["rouge", "bleu", "bertscore", "bartscore"]
+      "metrics": ["rouge", "bleu", "bertscore"]
     },
     "5": {
       "name": "classification_exact",
@@ -25,7 +25,7 @@
     },
     "7": {
       "name": "numeric_uncertainty",
-      "metrics": ["perplexity", "mse"]
+      "metrics": ["perplexity"]
     },
     "8": {
       "name": "minimal_text_quality",
