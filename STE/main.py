@@ -5,7 +5,7 @@ import numpy as np
 import time
 import fire
 from transformers import pipeline  # Import Hugging Face pipeline
-from utils import find_reverse, random_choose, parse_response, strip_end, get_random_metric_subgroup_with_flags
+from utils import find_reverse, random_choose, parse_response, strip_end#, get_random_metric_subgroup_with_flags
 from my_llm import chat_my, visualize_messages, get_chat_completion_my, set_tokenizer
 # Load the LLaMA 2 model and tokenizer, using the cache
 from transformers import AutoTokenizer, AutoModelForCausalLM
