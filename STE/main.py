@@ -13,9 +13,10 @@ import torch
 from datetime import datetime  # For generating dynamic filenames
 import evaluate
 import random
+# develop: checkpoint before trying to fully adapt to the new structure with llm-server
 
 def main(
-    model_ckpt: str = 'meta-llama/Meta-Llama-3-8B-Instruct',  # Updated to use LLaMA-2
+    model_ckpt: str = 'meta-llama/Meta-Llama-3-8B-Instruct',
     num_episodes: int = 15,
     num_stm_slots: int = 3,
     max_turn: int = 4,
