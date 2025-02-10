@@ -47,7 +47,7 @@
       }
   },
   "bleu": {
-      "description": "BLEU (Bilingual Evaluation Understudy) is a metric for evaluating the quality of machine translation by comparing a candidate translation against one or more reference translations. It computes the geometric mean of n-gram precisions with a brevity penalty to account for overly short translations. BLEU scores range from 0 to 1, with higher scores indicating closer similarity to human translations.",
+      "description": "BLEU (Bilingual Evaluation Understudy) is a metric for evaluating the quality of N machine translation by comparing a candidate translation against N reference translations. It computes the geometric mean of n-gram precisions with a brevity penalty to account for overly short translations. BLEU scores range from 0 to 1, with higher scores indicating closer similarity to human translations.",
       "required_parameters": [
           {
               "name": "predictions",
@@ -57,7 +57,7 @@
           },
           {
               "name": "references",
-              "type": "LIST of LIST of STRING",
+              "type": "LIST of STRING",
               "description": "A list where each element is a list of reference translations for the corresponding prediction.",
               "default": ""
           }
