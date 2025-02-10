@@ -3,7 +3,7 @@ import torch
 from termcolor import colored
 from copy import deepcopy
 import os
-import requests  # New import for HTTP calls
+import requests  # For HTTP calls to the llm_server
 
 # Set up the Hugging Face cache directory
 HF_HOME = "/huggingface_cache"
@@ -19,45 +19,38 @@ def set_tokenizer(new_tokenizer):
     global tokenizer
     tokenizer = new_tokenizer
 
-# URL of the inference server (adjust if necessary)
-LLM_SERVER_URL = "http://localhost:8000/generate"
-
-def get_chat_completion_my(messages, model=None, max_tokens=512, temp=0.7, return_raw=False, stop=None):
+def get_chat_completion_my(messages, max_tokens=512, temp=0.7, return_raw=False, stop=None):
     """
-    Generate a response using the LLM server.
+    Generate a response using the LLaMA model via the remote llm_server.
+    This function no longer requires a local model instance.
     """
-    if model is None:
-        raise ValueError("A valid model instance must be provided to get_chat_completion_my")
     if tokenizer is None:
         raise ValueError("Tokenizer has not been set. Please call set_tokenizer with a valid tokenizer.")
-
-    # Format messages (all the chat formatting logic stays here)
-    prompt = format_messages(messages)
-    inputs = tokenizer(prompt, return_tensors="pt").to(model.device)
-    token_ids = inputs.input_ids[0].tolist()
-    print("DEBUG: Prompt length (tokens):", len(token_ids))
     
-    # Instead of performing local generation, send an HTTP request to the LLM server
+    # Format messages using the local tokenizer for prompt formation
+    prompt = format_messages(messages)
+    print("DEBUG: Formatted prompt:", prompt)
+    
+    # Prepare payload for the llm_server
+    server_url = os.environ.get("MODEL_SERVER_URL", "http://localhost:8000/generate")
     payload = {
         "prompt": prompt,
         "max_tokens": max_tokens,
         "temperature": temp
     }
-    print("DEBUG: Sending request to LLM server with payload:")
-    print(payload)
+    print("DEBUG: Sending payload to LLM server:", payload)
     try:
-        response = requests.post(LLM_SERVER_URL, json=payload)
+        response = requests.post(server_url, json=payload)
         response_json = response.json()
         response_text = response_json.get("response", "")
     except Exception as e:
         print("ERROR: Failed to get response from LLM server:", e)
         response_text = ""
     
-    # Debug prints as before
     print(f"DEBUG-MY_LLM-LINE55: Full response before slicing:\n{response_text}")
     print(f"DEBUG-MY_LLM-LINE55: Length of prompt: {len(prompt)}")
     print(f"DEBUG-MY_LLM-LINE55: First {len(prompt)} characters of response: {response_text[:len(prompt)]}")
-
+    
     # Remove the prompt from the response
     response_text = response_text[len(prompt):].strip()
     print(f"DEBUG-MY_LLM-LINE55: Full response after slicing:\n{response_text}")
@@ -65,13 +58,12 @@ def get_chat_completion_my(messages, model=None, max_tokens=512, temp=0.7, retur
     # Apply stop condition if provided
     if stop and stop in response_text:
         response_text = response_text.split(stop)[0].strip()
-
+    
     return response_text if not return_raw else {"response": response_text}
 
 def format_messages(messages):
     """
     Format messages in a chat-friendly manner.
-    A unique marker (<|endofprompt|>) is appended to the end to help extract the generated text.
     """
     formatted = ""
     for msg in messages:
@@ -81,7 +73,6 @@ def format_messages(messages):
             formatted += f"[USER]: {msg['content']}\n"
         elif msg["role"] == "assistant":
             formatted += f"[ASSISTANT]: {msg['content']}\n"
-    #formatted += "<|endofprompt|>" # NEW MODIFICATION (left commented as before)
     return formatted
 
 def visualize_messages(messages):
@@ -103,9 +94,10 @@ def visualize_messages(messages):
 def chat_my(messages, new_message, visualize=True, **params):
     messages = deepcopy(messages)
     messages.append({"role": "user", "content": new_message})
+    # Call get_chat_completion_my without passing model
     response = get_chat_completion_my(messages, **params)
     messages.append({"role": "assistant", "content": response})
     print("DEBUG CHAT MY, RESPONSE: " + response)
     if visualize:
-        filtered_messages = [msg for msg in messages if msg['content'].strip()]
-        visualize_messages(filtered_messages[-2:])
+        visualize_messages(messages[-2:])
+    return messages

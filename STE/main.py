@@ -36,14 +36,14 @@ def main(
     print("DEBUG: Initializing tokenizer from MODEL_NAME.")
     tokenizer = AutoTokenizer.from_pretrained(MODEL_NAME, cache_dir=HF_HOME)
     tokenizer.add_special_tokens({"pad_token": "<PAD>"})
-    print("DEBUG: Initializing model from MODEL_NAME.")
-    model = AutoModelForCausalLM.from_pretrained(
-        MODEL_NAME, 
-        torch_dtype=torch.float16,
-        device_map="auto", 
-        cache_dir=HF_HOME
-    )
-    print(f"Model and tokenizer loaded successfully. Cached at {HF_HOME}")
+    # print("DEBUG: Initializing model from MODEL_NAME.")
+    # model = AutoModelForCausalLM.from_pretrained(
+    #     MODEL_NAME, 
+    #     torch_dtype=torch.float16,
+    #     device_map="auto", 
+    #     cache_dir=HF_HOME
+    # )
+    # print(f"Model and tokenizer loaded successfully. Cached at {HF_HOME}")
     # ----------------------------------------------
     # Set the global tokenizer to avoid duplicate loading
     from my_llm import set_tokenizer
@@ -132,7 +132,7 @@ def main(
 
             print("DEBUG: Generating the first query using chat_my.")
             response = chat_my(messages, prompt_q_added_question,
-                               temp=1.0, stop="Thought:", visualize=if_visualize, max_tokens=512, model=model)[-1]['content']
+                               temp=1.0, stop="Thought:", visualize=if_visualize, max_tokens=512)[-1]['content']
 
             messages = messages + [
                 {"role": "user", "content": prompt_q},
@@ -149,7 +149,7 @@ def main(
 
             chains = []
             print("DEBUG: Processing chain of calls for the first query.")
-            messages = chat_my(messages, prompt_a, temp=1.0, stop="Evaluation Result:", visualize=if_visualize, max_tokens=512, model=model)
+            messages = chat_my(messages, prompt_a, temp=1.0, stop="Evaluation Result:", visualize=if_visualize, max_tokens=512)
             temp = messages[-1]['content']
             parsed_response = parse_response(temp, API_name_list, API_descriptions)
             for _ in range(max_turn):
@@ -166,7 +166,7 @@ def main(
                 chains.append(parsed_response)
 
                 messages = chat_my(messages, "Evaluation Result: "+ evaluation_result,
-                                   temp=1.0, stop="Evaluation Result:", visualize=if_visualize, max_tokens=512, model=model)
+                                   temp=1.0, stop="Evaluation Result:", visualize=if_visualize, max_tokens=512)
                 temp = messages[-1]['content']
                 parsed_response = parse_response(temp, API_name_list, API_descriptions)
 
@@ -176,7 +176,7 @@ def main(
             first_item['chains'] = chains
 
             print("DEBUG: Running reflection to determine success for the first query.")
-            messages = chat_my(messages, prompt_reflection, temp=1.0, stop="Evaluation Result:", visualize=if_visualize, max_tokens=512, model=model)
+            messages = chat_my(messages, prompt_reflection, temp=1.0, stop="Evaluation Result:", visualize=if_visualize, max_tokens=512)
             res = messages[-1]['content']
             if "No" in res:
                 successful = "No"
@@ -201,7 +201,7 @@ def main(
 
                 print("DEBUG: Generating follow-up query using chat_my.")
                 response = chat_my(messages, template_q_follow_added_question,
-                                   temp=1.0, stop="Thought:", visualize=if_visualize, max_tokens=512, model=model)[-1]['content']
+                                   temp=1.0, stop="Thought:", visualize=if_visualize, max_tokens=512)[-1]['content']
                 messages = messages + [
                     {"role": "user", "content": template_q_follow},
                     {"role": "assistant", "content": response}
@@ -214,7 +214,7 @@ def main(
                 chains = []
                 print("DEBUG: Processing chain of calls for the short-term memory slot query.")
                 messages = chat_my(messages, template_a_follow,
-                                   temp=1.0, stop="Evaluation Result:", visualize=if_visualize, max_tokens=512, model=model)
+                                   temp=1.0, stop="Evaluation Result:", visualize=if_visualize, max_tokens=512)
                 temp = messages[-1]['content']
                 parsed_response = parse_response(temp, API_name_list, API_descriptions)
                 for _ in range(max_turn):
@@ -230,7 +230,7 @@ def main(
                     chains.append(parsed_response)
 
                     messages = chat_my(messages, "Evaluation Result: "+ evaluation_result,
-                                       temp=1.0, stop="Evaluation Result:", visualize=if_visualize, max_tokens=512, model=model)
+                                       temp=1.0, stop="Evaluation Result:", visualize=if_visualize, max_tokens=512)
                     temp = messages[-1]['content']
                     parsed_response = parse_response(temp, API_name_list, API_descriptions)
 
@@ -241,7 +241,7 @@ def main(
 
                 print("DEBUG: Running reflection to determine success for the short-term memory slot query.")
                 messages = chat_my(messages, prompt_reflection,
-                                   temp=1.0, stop="Evaluation Result:", visualize=if_visualize, max_tokens=512, model=model)
+                                   temp=1.0, stop="Evaluation Result:", visualize=if_visualize, max_tokens=512)
                 res = messages[-1]['content']
                 if "No" in res:
                     successful = "No"
