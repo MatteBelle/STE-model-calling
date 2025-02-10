@@ -30,7 +30,7 @@ ENV HF_HOME="/huggingface_cache"
 RUN mkdir -p /huggingface_cache
 
 # Copy the server script into the container
-COPY server.py /home/belletti/STE-model-calling/server.py
+COPY llm_server.py /home/belletti/STE-model-calling/llm_server.py
 
 # Expose the port that FastAPI will use
 EXPOSE 8000
