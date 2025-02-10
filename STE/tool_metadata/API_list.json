@@ -1,10 +1,10 @@
-[
-    "rouge",
-    "bleu",
-    "bertscore",
-    "perplexity",
-    "accuracy",
-    "exact_match",
-    "recall",
-    "f1"
-  ]
+[  
+  "bleu",
+  "bertscore",
+  "perplexity",
+  "rouge",
+  "accuracy",
+  "exact_match",
+  "recall",
+  "f1"
+]

@@ -1,0 +1,36 @@
+FROM nvidia/cuda:12.3.2-devel-ubuntu20.04
+LABEL maintainer="disi-unibo-nlp"
+
+ENV DEBIAN_FRONTEND=noninteractive
+
+WORKDIR /home/belletti/STE-model-calling
+
+# Install system dependencies and Python 3.9
+RUN apt-get update -y && \
+    apt-get install -y curl git bash nano wget python3.9 python3.9-distutils python3.9-venv python3-pip && \
+    apt-get autoremove -y && \
+    apt-get clean -y && \
+    rm -rf /var/lib/apt/lists/*
+
+# Upgrade pip and install general-purpose dependencies
+RUN pip3 install --upgrade pip && \
+    pip3 install wrapt gdown matplotlib
+
+# Copy the requirements file for the main container
+COPY STE/requirements.txt .
+
+# Install the dependencies from your requirements.txt
+RUN pip3 install --no-cache-dir -r requirements.txt
+
+# Additionally, install the following packages (as in run_docker.sh)
+RUN pip3 install --no-cache-dir accelerate==0.26.0 evaluate nltk absl-py rouge-score sacrebleu torch transformers numpy scipy scikit-learn bert_score requests
+
+# Set Hugging Face cache directory
+ENV HF_HOME="/huggingface_cache"
+
+# Copy the project source code into the container
+# Assuming your project structure places main.py, my_llm.py, and utils.py in STE/
+COPY STE/ /home/belletti/STE-model-calling/STE/
+
+# Set the container's default command to run main.py
+CMD ["python3", "/home/belletti/STE-model-calling/STE/main.py"]

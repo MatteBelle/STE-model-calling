@@ -1,0 +1,39 @@
+# Use the same base image as your reference
+FROM nvidia/cuda:12.3.2-devel-ubuntu20.04
+LABEL maintainer="disi-unibo-nlp"
+
+# Set noninteractive for zero interaction
+ENV DEBIAN_FRONTEND=noninteractive
+
+# Set working directory
+WORKDIR /home/belletti/STE-model-calling
+
+# Install system dependencies and Python 3.9
+RUN apt-get update -y && \
+    apt-get install -y curl git bash nano wget python3.9 python3.9-distutils python3.9-venv python3-pip && \
+    apt-get autoremove -y && \
+    apt-get clean -y && \
+    rm -rf /var/lib/apt/lists/*
+
+# Upgrade pip and install additional general dependencies
+RUN pip3 install --upgrade pip && \
+    pip3 install wrapt gdown matplotlib
+
+# Copy any additional requirements if needed (optional)
+# For our purposes, we install all needed Python packages below
+
+# Install Hugging Face and other LLM dependencies
+RUN pip3 install --no-cache-dir transformers torch accelerate==0.26.0 evaluate nltk absl-py rouge-score sacrebleu numpy scipy scikit-learn bert_score fastapi uvicorn pydantic
+
+# Set Hugging Face cache directory (this is also set in the environment)
+ENV HF_HOME="/huggingface_cache"
+RUN mkdir -p /huggingface_cache
+
+# Copy the server script into the container
+COPY server.py /home/belletti/STE-model-calling/server.py
+
+# Expose the port that FastAPI will use
+EXPOSE 8000
+
+# Run the server using uvicorn
+CMD ["uvicorn", "server:app", "--host", "0.0.0.0", "--port", "8000"]

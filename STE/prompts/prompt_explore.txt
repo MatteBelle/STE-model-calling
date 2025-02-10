@@ -1,50 +1,40 @@
-Your task is to answer the user's query as best you can. You have access to the following evaluation metrics (tools) which you can use via function calls to help with your response:
+Your task is to answer the user's query as best you can. You have access to the following metric which you can use via API call to help with your response:
 
 {api_descriptions}
 
-Now you have the chance to explore the available metrics. This involves:
-1) Synthesizing a natural user query that could benefit from evaluation. Example of tasks could be sentiment analysis, question answering, doc summarization, (free) text generation, poetry generation, NER, information extraction and others at your choice that can benefit from the available metrics.
-2) Responding to the user query using the evaluation metrics, focusing on queries that can be addressed with a single metric call.
+Now you have the chance to explore the available APIs. You can do this by 1) synthesizing some natural user query that calling the API could help, and 2) trying to respond to the user query with the help of the APIs. Here, you can focus on queries that only require calling the API once.
 
-Start by inputting your synthesized user query. Make the query as natural as possible without using the provided metric descriptions or metric names directly (since the user does not know what evaluation tools you have). Input just the user query alone; do NOT solve the query for now.
+Now, first input your synthesized user query. You should make the query natural, pretending to be a user that wants to measure a metric score from some texts he is providing as strings in the request. Input just the user query alone; do NOT solve the query for now.
 
 User Query:
-
 =========
 
 Now, try to respond to the query using the available evaluation metrics.
 
-The format you use for the metric call is by specifying: 
-1) Action: the evaluation metric name you would like to use  
-2) Action Input: the input parameters for the metric call in a JSON string format. The result of the evaluation call will be returned starting with "Observation:". Remember that you should only perform a SINGLE action at a time; do NOT return a list of multiple actions.
+The format you use for the evaluation metric is by specifying 1) Action: the name of the metric you want to call 2) Action Input: the input parameters for the metric in a JSON string format such that predictions and references have the same number of entries in their lists. The result of the metric call will be returned starting with "Evaluation Result:". Remember that you should only perform a SINGLE action at a time; do NOT return a list of multiple actions.
 
 Reminder:
-1) The only values that should follow "Action:" are: {api_names}
-2) Use the following JSON string format for the evaluation arguments:
+1) The only values that should follow "Action:" are: {metric_name}
+2) Use the following JSON string format for the evaluation arguments.
 
 Action Input:
 {{
-    "predictions": "Once upon a time there was a hero...",
-    "references": "Once upon a time, there was a hero.",
-    "kwargs": {{
-        "key_1": "value_1" // optional parameters relative to the metric given in the descriptions above
-        ...
-    }}
+    "key_1": "value_1",
+    ...
+    "key_n": "value_n",
 }}
 
 Remember to ALWAYS use the following format:
 
 Thought: you should always think about what to do next  
 Action: the evaluation metric name  
-Action Input: the input parameters for the metric call in JSON string format, remember that you have to provide the text input by generating it yourself.
-Observation: the return result of the evaluation call. This is what I will provide you with; you do not need to repeat it in your response.  
-... (this Thought/Action/Action Input/Observation cycle can repeat N times)  
+Action Input: the input parameters for the metric function in JSON string format  
+Evaluation Result: the return result of the evaluation function. This is what I will provide you with; you do not need to repeat it in your response.  
+... (this Thought/Action/Action Input/Evaluation Result cycle can repeat N times)  
 Thought: I now know the final answer  
-Final Answer: the response to the user query
+Final Answer: the response to the user query and some considerations on the result
 
-Begin! Remember that your response should never start with "Observation:" since that is what I will provide you with. Once you have enough information, please immediately use 
-
-\nThought: I now know the final answer\nFinal Answer:
+Begin! Remember that your response should never start with "Evaluation Result:" since that is what I will provide you with. Once you have enough information, please immediately use \nThought: I now know the final answer\nFinal Answer:
 
 User Query (the same you just synthesized): {query}
 
@@ -56,10 +46,4 @@ User Query:
 
 =========
 
-Now try to solve the query using the evaluation metrics. Remember to follow the same format, i.e.,
-
-Thought:  
-Action:  
-Action Input:  
-Observation:  
-Final Answer:
+Now try to solve the query using the evaluation metrics. Remember to follow the same format, i.e.,\nThought:\nAction:\nAction Input:\nEvaluation Result:\nFinal Answer:

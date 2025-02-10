@@ -5,89 +5,14 @@ import numpy as np
 import time
 import fire
 from transformers import pipeline  # Import Hugging Face pipeline
-from utils import find_reverse, random_choose, parse_response, strip_end
+from utils import find_reverse, random_choose, parse_response, strip_end, get_random_metric_subgroup_with_flags
 from my_llm import chat_my, visualize_messages, get_chat_completion_my, set_tokenizer
 # Load the LLaMA 2 model and tokenizer, using the cache
 from transformers import AutoTokenizer, AutoModelForCausalLM
 import torch
 from datetime import datetime  # For generating dynamic filenames
 import evaluate
-
-def LTM(X, labels):
-    print("DEBUG: Calling LTM function.")
-    assert len(X) == len(labels)
-    return ["Query: {} | Solved: {}".format(X[i], labels[i]) for i in range(len(X))]
-
-def normalize_evaluation_args(metric_name, args, API_descriptions):
-    """
-    Normalize and coerce the evaluation inputs so that they match the expected types.
-    This function uses the metadata for the given metric (from API_descriptions)
-    to determine expected types for each parameter.
-    """
-
-    try:
-        # Load metadata for the metric (the value is a JSON string)
-        metric_meta = json.loads(API_descriptions[metric_name])
-    except Exception as e:
-        print(f"DEBUG: Error loading metadata for {metric_name}: {e}")
-        metric_meta = {}
-
-    normalized_args = {}
-
-    # Merge "kwargs" into the main args dictionary if present
-    if "kwargs" in args and isinstance(args["kwargs"], dict):
-        print("DEBUG: Expanding 'kwargs' into args.")
-        args.update(args.pop("kwargs"))
-
-    # Get a list of expected parameters from required and optional parameters.
-    param_list = metric_meta.get("required_parameters", []) + metric_meta.get("optional_parameters", [])
-
-    # Build a mapping: parameter name -> expected type (as lower-case string)
-    expected_types = {param["name"]: param["type"].lower() for param in param_list}
-
-    for key, value in args.items():
-        exp_type = expected_types.get(key, None)
-
-        if exp_type is None:
-            # If we do not have a type specification, leave the value as is.
-            normalized_args[key] = value
-        else:
-            try:
-                if exp_type.startswith("list"):
-                    # Expected a list. If not a list, try to split or wrap it.
-                    if not isinstance(value, list):
-                        if isinstance(value, str):
-                            # Split by comma, then strip whitespace.
-                            normalized_args[key] = [item.strip() for item in value.split(",") if item.strip()]
-                        else:
-                            normalized_args[key] = [value]
-                    else:
-                        normalized_args[key] = value
-                elif exp_type == "boolean":
-                    # Convert string representations to boolean.
-                    if isinstance(value, str):
-                        normalized_args[key] = True if value.lower() in ["true", "1", "yes"] else False
-                    else:
-                        normalized_args[key] = bool(value)
-                elif exp_type == "number":
-                    # Attempt to convert to integer or float.
-                    if isinstance(value, (int, float)):
-                        normalized_args[key] = value
-                    else:
-                        str_val = str(value)
-                        if "." in str_val:
-                            normalized_args[key] = float(str_val)
-                        else:
-                            normalized_args[key] = int(str_val)
-                elif exp_type == "string":
-                    normalized_args[key] = str(value)
-                else:
-                    normalized_args[key] = value
-            except Exception as e:
-                print(f"DEBUG: Error normalizing parameter '{key}' with value '{value}': {e}")
-                normalized_args[key] = value
-
-    return normalized_args
+import random
 
 def main(
     model_ckpt: str = 'meta-llama/Meta-Llama-3-8B-Instruct',  # Updated to use LLaMA-2
@@ -109,11 +34,14 @@ def main(
 
     MODEL_NAME = "meta-llama/Meta-Llama-3-8B-Instruct"
     print("DEBUG: Initializing tokenizer from MODEL_NAME.")
-    tokenizer = AutoTokenizer.from_pretrained(MODEL_NAME, cache_dir=HF_HOME, max_length=4096)
+    tokenizer = AutoTokenizer.from_pretrained(MODEL_NAME, cache_dir=HF_HOME)
     tokenizer.add_special_tokens({"pad_token": "<PAD>"})
     print("DEBUG: Initializing model from MODEL_NAME.")
     model = AutoModelForCausalLM.from_pretrained(
-        MODEL_NAME, torch_dtype=torch.float16, device_map="auto", cache_dir=HF_HOME
+        MODEL_NAME, 
+        torch_dtype=torch.float16,
+        device_map="auto", 
+        cache_dir=HF_HOME
     )
     print(f"Model and tokenizer loaded successfully. Cached at {HF_HOME}")
     # ----------------------------------------------
@@ -204,7 +132,7 @@ def main(
 
             print("DEBUG: Generating the first query using chat_my.")
             response = chat_my(messages, prompt_q_added_question,
-                               temp=1.0, stop="Thought:", visualize=if_visualize, max_tokens=360, model=model)[-1]['content']
+                               temp=1.0, stop="Thought:", visualize=if_visualize, max_tokens=512, model=model)[-1]['content']
 
             messages = messages + [
                 {"role": "user", "content": prompt_q},
@@ -213,7 +141,7 @@ def main(
 
             query = messages[-1]['content']
             prompt_a = template_a.format(
-                api_names=", ".join(API_name_list),
+                metric_name=", ".join(API_name_list),
                 query=query,
             )
             first_item['query'] = query
@@ -221,23 +149,24 @@ def main(
 
             chains = []
             print("DEBUG: Processing chain of calls for the first query.")
-            messages = chat_my(messages, prompt_a, temp=1.0, stop="Observation:", visualize=if_visualize, max_tokens=360, model=model)
+            messages = chat_my(messages, prompt_a, temp=1.0, stop="Evaluation Result:", visualize=if_visualize, max_tokens=512, model=model)
             temp = messages[-1]['content']
             parsed_response = parse_response(temp, API_name_list, API_descriptions)
             for _ in range(max_turn):
                 if not parsed_response['parse_successful']:
-                    observation = parsed_response['parse_error_msg']
+                    evaluation_result = parsed_response['parse_error_msg']
                 else:
                     if parsed_response['finish']:
+                        print("DEBUGDEBUGDEBUG: MAIN RICONOSCE CHE LA TASK E' FINITA, PROSSIMO TURNO CON PROMPT DIVERSO")
                         chains.append(parsed_response)
                         break
                     else:
-                        observation = run_evaluation(parsed_response['action'], parsed_response['action_input'])
-                parsed_response['observation'] = observation
+                        evaluation_result = run_evaluation(parsed_response['action'], parsed_response['action_input'])
+                parsed_response['evaluation_result'] = evaluation_result
                 chains.append(parsed_response)
 
-                messages = chat_my(messages, "Observation: "+observation,
-                                   temp=1.0, stop="Observation:", visualize=if_visualize, max_tokens=360, model=model)
+                messages = chat_my(messages, "Evaluation Result: "+ evaluation_result,
+                                   temp=1.0, stop="Evaluation Result:", visualize=if_visualize, max_tokens=512, model=model)
                 temp = messages[-1]['content']
                 parsed_response = parse_response(temp, API_name_list, API_descriptions)
 
@@ -247,7 +176,7 @@ def main(
             first_item['chains'] = chains
 
             print("DEBUG: Running reflection to determine success for the first query.")
-            messages = chat_my(messages, prompt_reflection, temp=1.0, stop="Observation:", visualize=if_visualize, max_tokens=360, model=model)
+            messages = chat_my(messages, prompt_reflection, temp=1.0, stop="Evaluation Result:", visualize=if_visualize, max_tokens=512, model=model)
             res = messages[-1]['content']
             if "No" in res:
                 successful = "No"
@@ -259,7 +188,6 @@ def main(
             item_list.append(first_item)
 
             for _ in range(num_stm_slots-1):
-                print("DEBUG: Processing a short-term memory slot.")
                 item = dict()
 
                 if len(explored_queries) > 0:
@@ -273,7 +201,7 @@ def main(
 
                 print("DEBUG: Generating follow-up query using chat_my.")
                 response = chat_my(messages, template_q_follow_added_question,
-                                   temp=1.0, stop="Thought:", visualize=if_visualize, max_tokens=360, model=model)[-1]['content']
+                                   temp=1.0, stop="Thought:", visualize=if_visualize, max_tokens=512, model=model)[-1]['content']
                 messages = messages + [
                     {"role": "user", "content": template_q_follow},
                     {"role": "assistant", "content": response}
@@ -286,23 +214,23 @@ def main(
                 chains = []
                 print("DEBUG: Processing chain of calls for the short-term memory slot query.")
                 messages = chat_my(messages, template_a_follow,
-                                   temp=1.0, stop="Observation:", visualize=if_visualize, max_tokens=360, model=model)
+                                   temp=1.0, stop="Evaluation Result:", visualize=if_visualize, max_tokens=512, model=model)
                 temp = messages[-1]['content']
                 parsed_response = parse_response(temp, API_name_list, API_descriptions)
                 for _ in range(max_turn):
                     if not parsed_response['parse_successful']:
-                        observation = parsed_response['parse_error_msg']
+                        evaluation_result = parsed_response['parse_error_msg']
                     else:
                         if parsed_response['finish']:
                             chains.append(parsed_response)
                             break
                         else:
-                            observation = run_evaluation(parsed_response['action'], parsed_response['action_input'])
-                    parsed_response['observation'] = observation
+                            evaluation_result = run_evaluation(parsed_response['action'], parsed_response['action_input'])
+                    parsed_response['evaluation_result'] = evaluation_result
                     chains.append(parsed_response)
 
-                    messages = chat_my(messages, "Observation: "+observation,
-                                       temp=1.0, stop="Observation:", visualize=if_visualize, max_tokens=360, model=model)
+                    messages = chat_my(messages, "Evaluation Result: "+ evaluation_result,
+                                       temp=1.0, stop="Evaluation Result:", visualize=if_visualize, max_tokens=512, model=model)
                     temp = messages[-1]['content']
                     parsed_response = parse_response(temp, API_name_list, API_descriptions)
 
@@ -313,7 +241,7 @@ def main(
 
                 print("DEBUG: Running reflection to determine success for the short-term memory slot query.")
                 messages = chat_my(messages, prompt_reflection,
-                                   temp=1.0, stop="Observation:", visualize=if_visualize, max_tokens=360, model=model)
+                                   temp=1.0, stop="Evaluation Result:", visualize=if_visualize, max_tokens=512, model=model)
                 res = messages[-1]['content']
                 if "No" in res:
                     successful = "No"
@@ -331,7 +259,6 @@ def main(
             )
 
             # Save partial / intermediate results right after each session
-            print("DEBUG: Saving intermediate results for session.")
             timestamp = datetime.now().strftime("%Y%m%d_%H%M%S_%f")
             partial_filename = os.path.join(dir_write, f"intermediate_{API}_session_{session_id}_{timestamp}.json")
             try:
@@ -347,12 +274,89 @@ def main(
 
         data_dict[API] = all_sessions
 
-    print("DEBUG: Writing final data_dict to JSON file.")
     final_data_path = os.path.join(dir_write, f"data_dict_{timestamp}.json")
     with open(final_data_path, "w", encoding='utf-8') as f:
         json.dump(data_dict, f)
     print(f"DEBUG: Final data saved to {final_data_path}")
     print("DEBUG: Finished main function.")
+
+
+def LTM(X, labels):
+    print("DEBUG: Calling LTM function.")
+    assert len(X) == len(labels)
+    return ["Query: {} \n Solved: {}".format(X[i], labels[i]) for i in range(len(X))]
+
+def normalize_evaluation_args(metric_name, args, API_descriptions):
+    """
+    Normalize and coerce the evaluation inputs so that they match the expected types.
+    This function uses the metadata for the given metric (from API_descriptions)
+    to determine expected types for each parameter.
+    """
+
+    try:
+        # Load metadata for the metric (the value is a JSON string)
+        metric_meta = API_descriptions[metric_name]
+    except Exception as e:
+        print(f"DEBUG: Error loading metadata for {metric_name}: {e}")
+        metric_meta = {}
+
+    normalized_args = {}
+
+    # Merge "kwargs" into the main args dictionary if present
+    if "kwargs" in args and isinstance(args["kwargs"], dict):
+        print("DEBUG: Expanding 'kwargs' into args.")
+        args.update(args.pop("kwargs"))
+
+    # Get a list of expected parameters from required and optional parameters.
+    param_list = metric_meta.get("required_parameters", []) + metric_meta.get("optional_parameters", [])
+
+    # Build a mapping: parameter name -> expected type (as lower-case string)
+    expected_types = {param["name"]: param["type"].lower() for param in param_list}
+
+    for key, value in args.items():
+        exp_type = expected_types.get(key, None)
+
+        if exp_type is None:
+            # If we do not have a type specification, leave the value as is.
+            normalized_args[key] = value
+        else:
+            try:
+                if exp_type.startswith("list"):
+                    # Expected a list.
+                    # Instead of splitting by commas, simply wrap the string in a list.
+                    if not isinstance(value, list):
+                        if isinstance(value, str):
+                            # Do not split by commas; treat the entire string as a single list element.
+                            normalized_args[key] = [value.strip()]
+                        else:
+                            normalized_args[key] = [value]
+                    else:
+                        normalized_args[key] = value
+                elif exp_type == "boolean":
+                    # Convert string representations to boolean.
+                    if isinstance(value, str):
+                        normalized_args[key] = True if value.lower() in ["true", "1", "yes"] else False
+                    else:
+                        normalized_args[key] = bool(value)
+                elif exp_type == "number":
+                    # Attempt to convert to integer or float.
+                    if isinstance(value, (int, float)):
+                        normalized_args[key] = value
+                    else:
+                        str_val = str(value)
+                        if "." in str_val:
+                            normalized_args[key] = float(str_val)
+                        else:
+                            normalized_args[key] = int(str_val)
+                elif exp_type == "string":
+                    normalized_args[key] = str(value)
+                else:
+                    normalized_args[key] = value
+            except Exception as e:
+                print(f"DEBUG: Error normalizing parameter '{key}' with value '{value}': {e}")
+                normalized_args[key] = value
+                
+    return normalized_args
 
 if __name__ == '__main__':
     fire.Fire(main)
