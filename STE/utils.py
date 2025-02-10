@@ -1,7 +1,8 @@
 import numpy as np
 import json
 from difflib import get_close_matches
-
+import random
+import os
 
 def find_reverse(str_a, ch):
     assert type(str_a) == type(ch) == str
@@ -158,6 +159,38 @@ def parse_response(response, API_name_list, api_descriptions,
     item['action_input'] = action_input_obj
     return item
 
+def get_random_metric_subgroup_with_flags(json_path="tool_metadata/API_subgroups.json"):
+    """
+    Loads the metric subgroups from a JSON file, randomly selects one subgroup,
+    and for each metric in that subgroup, generates a boolean flag that is True
+    with 30% probability (and False with 70% probability).
+
+    Parameters:
+        json_path (str): Path to the JSON file containing the metric subgroups.
+
+    Returns:
+        dict: A dictionary with the following keys:
+            - "name": The name of the selected subgroup.
+            - "metrics": A list of metric names in the subgroup.
+            - "optional_flags": A dictionary mapping each metric name to a boolean flag.
+    """
+    if not os.path.exists(json_path):
+        raise FileNotFoundError(f"Subgroups JSON file not found at: {json_path}")
+    
+    with open(json_path, "r", encoding="utf-8") as f:
+        subgroups = json.load(f)
+    
+    # Randomly choose one subgroup from the dictionary values.
+    chosen_subgroup = random.choice(list(subgroups.values()))
+    
+    # For each metric in the subgroup, assign a boolean flag (True with probability 0.3).
+    optional_flags = {metric: (random.random() < 0.3) for metric in chosen_subgroup["metrics"]}
+    
+    return {
+        "name": chosen_subgroup["name"],
+        "metrics": chosen_subgroup["metrics"],
+        "optional_flags": optional_flags
+    }
 
 if __name__ == '__main__':
     print()
