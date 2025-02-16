@@ -19,7 +19,7 @@ def set_tokenizer(new_tokenizer):
     global tokenizer
     tokenizer = new_tokenizer
 
-def get_chat_completion_my(messages, max_tokens=512, temp=0.7, return_raw=False, stop=None):
+def get_chat_completion_my(messages, max_tokens=512, temp=0.1, return_raw=False, stop=None):
     """
     Generate a response using the LLaMA model via the remote llm_server.
     This function no longer requires a local model instance.

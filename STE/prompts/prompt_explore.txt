@@ -1,10 +1,18 @@
-Your task is to answer the user's query as best you can. You have access to the following metric which you can use via API call to help with your response:
-
+You are an **expert** assisting in evaluation.   
+Your task is to **output a single, well-structured query** that a user might naturally ask when requesting a metric evaluation.  
+**Context:**
 {api_descriptions}
 
-Now you have the chance to explore the available APIs. You can do this by 1) synthesizing some natural user query that calling the API could help, and 2) trying to respond to the user query with the help of the APIs. Here, you can focus on queries that only require calling the API once.
-
-Now, first input your synthesized user query. You should make the query natural, pretending to be a user that wants to measure a metric score from some texts he is providing as strings in the request. Input just the user query alone; do NOT solve the query for now.
+**Task Instructions:**  
+Generate **one** realistic user query.  
+The query should be **concise, natural, and human-like**.  
+The query should **only** request metric evaluation **for a set references and predictions**.  
+It should provide parameters.   
+The query should provide very creative, diverse and long references and predictions.   
+Do **not** add explanations, descriptions, or metadata.  
+Do **not** repeat yourself.  
+Do **not** format the query as JSON or a code block.  
+**Stop after outputting the query.**
 
 User Query:
 =========
@@ -42,8 +50,8 @@ User Query (the same you just synthesized): {query}
 
 Now you know a bit more about the available evaluation metrics. You can synthesize another user query to explore the metrics further and consolidate your understanding based on what you discovered. Again, just input the user query alone; do NOT solve the query for now.
 
-User Query:
+Generate one new User Query:
 
 =========
 
-Now try to solve the query using the evaluation metrics. Remember to follow the same format, i.e.,\nThought:\nAction:\nAction Input:\nEvaluation Result:\nFinal Answer:
+Now try to solve the query using the evaluation metrics. Remember to follow the same format, i.e.,\nThought: \nAction: \nAction Input: \nEvaluation Result:\nFinal Answer: 

@@ -19,11 +19,12 @@ def main(
     num_episodes: int = 15,
     num_stm_slots: int = 3,
     max_turn: int = 4,
-    dir_write: str = "results/",
+    intermediate_dir_write: str = "STE/results/intermediate_results/",
+    final_dir_write: str = "STE/results/final_results/",
     if_visualize: bool = True,
 ):
     print("DEBUG: Entering main function with parameters:")
-    print(f"DEBUG: model_ckpt={model_ckpt}, num_episodes={num_episodes}, num_stm_slots={num_stm_slots}, max_turn={max_turn}, dir_write={dir_write}, if_visualize={if_visualize}")
+    print(f"DEBUG: model_ckpt={model_ckpt}, num_episodes={num_episodes}, num_stm_slots={num_stm_slots}, max_turn={max_turn}, final_dir_write={final_dir_write}, if_visualize={if_visualize}")
 
     # ----------------------------------------------
     print("DEBUG: Setting HF_HOME environment variable and creating cache directory if it does not exist.")
@@ -92,7 +93,8 @@ def main(
     prompt_reflection = "Do you think you successfully fulfilled this query in the end? Respond with \"Yes\" or \"No\"."
 
     print("DEBUG: Ensuring output directory exists.")
-    os.makedirs(dir_write, exist_ok=True)
+    os.makedirs(final_dir_write, exist_ok=True)
+    os.makedirs(intermediate_dir_write, exist_ok=True)
     data_dict = dict()
 
     print("DEBUG: Starting iteration over API_list.")
@@ -101,10 +103,11 @@ def main(
         API_name_list = [API]
 
         with open("STE/prompts/prompt_explore.txt", "r") as f:
-            prompt_template = f.read().strip()
+            prompt_template = f.read().strip() #TOCHECK 15/02
+            #prompt_template = f.read()
 
         template_q, template_a, template_q_follow, template_a_follow = prompt_template.split("=========")
-        template_q, template_a, template_q_follow, template_a_follow = template_q.strip(), template_a.strip(), template_q_follow.strip(), template_a_follow.strip()
+        template_q, template_a, template_q_follow, template_a_follow = template_q.strip(), template_a.strip(), template_q_follow.strip(), template_a_follow.strip() #TOCHECK 15/02
 
         all_sessions, explored_queries, whether_successful = [], [], []
 
@@ -118,8 +121,14 @@ def main(
             )
 
             if len(explored_queries) > 0:
-                assert prompt_q.endswith("User Query:")
-                prompt_q_added_question = strip_end(prompt_q, "User Query:").strip()
+                #assert prompt_q.endswith("User Query:")
+                try:
+                    assert prompt_q.endswith("User Query:")
+                except AssertionError:
+                    print(f"DEBUG: Assertion failed! prompt_q does not end with 'User Query:'. Tail of prompt_q: {prompt_q[-20:]}")
+                    raise  # Re-raise the exception after logging
+                prompt_q_added_question = strip_end(prompt_q, "User Query:").strip() #TOCHECK 15/02
+                #prompt_q_added_question = strip_end(prompt_q, "User Query:")                
                 prompt_q_added_question = prompt_q_added_question + "\n\n" + \
                     PAST_Q_MSG_pre + "\n" + "\n".join(LTM(explored_queries, whether_successful)) + \
                     "\n\n" + PAST_Q_MSG_post + "\n\nUser Query:"
@@ -132,7 +141,7 @@ def main(
 
             print("DEBUG: Generating the first query using chat_my.")
             response = chat_my(messages, prompt_q_added_question,
-                               temp=1.0, stop="Thought:", visualize=if_visualize, max_tokens=512)[-1]['content']
+                               temp=0.2, stop="Thought:", visualize=if_visualize, max_tokens=512)[-1]['content']
 
             messages = messages + [
                 {"role": "user", "content": prompt_q},
@@ -149,7 +158,7 @@ def main(
 
             chains = []
             print("DEBUG: Processing chain of calls for the first query.")
-            messages = chat_my(messages, prompt_a, temp=1.0, stop="Evaluation Result:", visualize=if_visualize, max_tokens=512)
+            messages = chat_my(messages, prompt_a, temp=0.2, stop="Evaluation Result:", visualize=if_visualize, max_tokens=512)
             temp = messages[-1]['content']
             parsed_response = parse_response(temp, API_name_list, API_descriptions)
             for _ in range(max_turn):
@@ -166,7 +175,7 @@ def main(
                 chains.append(parsed_response)
 
                 messages = chat_my(messages, "Evaluation Result: "+ evaluation_result,
-                                   temp=1.0, stop="Evaluation Result:", visualize=if_visualize, max_tokens=512)
+                                   temp=0.2, stop="Evaluation Result:", visualize=if_visualize, max_tokens=512)
                 temp = messages[-1]['content']
                 parsed_response = parse_response(temp, API_name_list, API_descriptions)
 
@@ -176,7 +185,7 @@ def main(
             first_item['chains'] = chains
 
             print("DEBUG: Running reflection to determine success for the first query.")
-            messages = chat_my(messages, prompt_reflection, temp=1.0, stop="Evaluation Result:", visualize=if_visualize, max_tokens=512)
+            messages = chat_my(messages, prompt_reflection, temp=0.2, stop="Evaluation Result:", visualize=if_visualize, max_tokens=512)
             res = messages[-1]['content']
             if "No" in res:
                 successful = "No"
@@ -191,8 +200,14 @@ def main(
                 item = dict()
 
                 if len(explored_queries) > 0:
-                    assert template_q_follow.endswith("User Query:")
-                    template_q_follow_added_question = strip_end(template_q_follow, "User Query:").strip()
+                    #assert template_q_follow.endswith("User Query:")
+                    try:
+                        assert template_q_follow.endswith("User Query:")
+                    except AssertionError:
+                        print(f"DEBUG: Assertion failed! prompt_q_follow does not end with 'User Query:'. Tail of prompt_q: {template_q_follow[-20:]}")
+                        raise  # Re-raise the exception after logging
+                    template_q_follow_added_question = strip_end(template_q_follow, "User Query:").strip() # TOCHECK 15/02
+                    #template_q_follow_added_question = strip_end(template_q_follow, "User Query:")
                     template_q_follow_added_question = template_q_follow_added_question + "\n\n" + \
                     PAST_Q_MSG_pre + "\n" + "\n".join(LTM(explored_queries, whether_successful)) + \
                     "\n\n" + PAST_Q_MSG_post + "\n\nUser Query:"
@@ -201,7 +216,7 @@ def main(
 
                 print("DEBUG: Generating follow-up query using chat_my.")
                 response = chat_my(messages, template_q_follow_added_question,
-                                   temp=1.0, stop="Thought:", visualize=if_visualize, max_tokens=512)[-1]['content']
+                                   temp=0.2, stop="Thought:", visualize=if_visualize, max_tokens=512)[-1]['content']
                 messages = messages + [
                     {"role": "user", "content": template_q_follow},
                     {"role": "assistant", "content": response}
@@ -214,7 +229,7 @@ def main(
                 chains = []
                 print("DEBUG: Processing chain of calls for the short-term memory slot query.")
                 messages = chat_my(messages, template_a_follow,
-                                   temp=1.0, stop="Evaluation Result:", visualize=if_visualize, max_tokens=512)
+                                   temp=0.2, stop="Evaluation Result:", visualize=if_visualize, max_tokens=512)
                 temp = messages[-1]['content']
                 parsed_response = parse_response(temp, API_name_list, API_descriptions)
                 for _ in range(max_turn):
@@ -230,7 +245,7 @@ def main(
                     chains.append(parsed_response)
 
                     messages = chat_my(messages, "Evaluation Result: "+ evaluation_result,
-                                       temp=1.0, stop="Evaluation Result:", visualize=if_visualize, max_tokens=512)
+                                       temp=0.2, stop="Evaluation Result:", visualize=if_visualize, max_tokens=512)
                     temp = messages[-1]['content']
                     parsed_response = parse_response(temp, API_name_list, API_descriptions)
 
@@ -241,7 +256,7 @@ def main(
 
                 print("DEBUG: Running reflection to determine success for the short-term memory slot query.")
                 messages = chat_my(messages, prompt_reflection,
-                                   temp=1.0, stop="Evaluation Result:", visualize=if_visualize, max_tokens=512)
+                                   temp=0.2, stop="Evaluation Result:", visualize=if_visualize, max_tokens=512)
                 res = messages[-1]['content']
                 if "No" in res:
                     successful = "No"
@@ -258,23 +273,23 @@ def main(
                 }
             )
 
-            # Save partial / intermediate results right after each session
+            # Save intermediate / intermediate results right after each session
             timestamp = datetime.now().strftime("%Y%m%d_%H%M%S_%f")
-            partial_filename = os.path.join(dir_write, f"intermediate_{API}_session_{session_id}_{timestamp}.json")
+            intermediate_filename = os.path.join(intermediate_dir_write, f"intermediate_{API}_session_{session_id}_{timestamp}.json")
             try:
-                with open(partial_filename, "w", encoding='utf-8') as f:
+                with open(intermediate_filename, "w", encoding='utf-8') as f:
                     json.dump({
                         "API": API,
                         "session_id": session_id,
                         "all_sessions_so_far": all_sessions
                     }, f, ensure_ascii=False, indent=2)
-                print(f"DEBUG: Intermediate results saved to {partial_filename}")
+                print(f"DEBUG: Intermediate results saved to {intermediate_filename}")
             except Exception as e:
                 print(f"DEBUG: Error saving intermediate results: {e}")
 
         data_dict[API] = all_sessions
 
-    final_data_path = os.path.join(dir_write, f"data_dict_{timestamp}.json")
+    final_data_path = os.path.join(final_dir_write, f"data_dict_{timestamp}.json")
     with open(final_data_path, "w", encoding='utf-8') as f:
         json.dump(data_dict, f)
     print(f"DEBUG: Final data saved to {final_data_path}")
@@ -283,7 +298,12 @@ def main(
 
 def LTM(X, labels):
     print("DEBUG: Calling LTM function.")
-    assert len(X) == len(labels)
+    #assert len(X) == len(labels)
+    try:
+        assert len(X) == len(labels)
+    except AssertionError:
+        print(f"DEBUG: Assertion failed! len(X) == len(labels) '. len(X) {len(X)}, len(labels) {len(labels)}")
+        raise  # Re-raise the exception after logging
     return ["Query: {} \n Solved: {}".format(X[i], labels[i]) for i in range(len(X))]
 
 def normalize_evaluation_args(metric_name, args, API_descriptions):

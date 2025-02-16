@@ -28,7 +28,7 @@ app = FastAPI()
 class InferenceRequest(BaseModel):
     prompt: str
     max_tokens: int = 512
-    temperature: float = 0.7
+    temperature: float = 0.15
 
 @app.post("/generate")
 async def generate_text(request: InferenceRequest):

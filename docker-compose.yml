@@ -1,5 +1,4 @@
-version: "3.3"
-
+#version: "3.3"
 services:
   llm-server:
     build:
@@ -9,7 +8,7 @@ services:
     runtime: nvidia
     environment:
       - HF_HOME=/huggingface_cache
-      - HUGGING_FACE_HUB_TOKEN=<<YOUR_HUGGING_FACE_HUB_TOKEN>>
+      - HUGGING_FACE_HUB_TOKEN=<YOUR_HUGGING_FACE_HUB_TOKEN>
     volumes:
       - /home/belletti/huggingface_cache:/huggingface_cache
       - /home/belletti/STE-model-calling/STE:/home/belletti/STE-model-calling/STE
@@ -24,17 +23,15 @@ services:
     runtime: nvidia
     environment:
       - HF_HOME=/huggingface_cache
-      - HUGGING_FACE_HUB_TOKEN=<<YOUR_HUGGING_FACE_HUB_TOKEN>>
+      - HUGGING_FACE_HUB_TOKEN=<YOUR_HUGGING_FACE_HUB_TOKEN>
       - MODEL_CKPT=meta-llama/Meta-Llama-3-8B-Instruct
       - NUM_EPISODES=3
       - NUM_STM_SLOTS=3
       - MAX_TURN=3
-      - DIR_WRITE=STE/results/
-      - RAPIDAPI_KEY=gaEUVyQ6X90IsxLekvznKw2ZJH5MFmOfWucC1p4loRDG8j3rqY
+      - RAPIDAPI_KEY=<YOUR_RAPIDAPI_KEY>
       - MODEL_SERVER_URL=http://llm-server:8000/generate
     volumes:
       - /home/belletti/STE-model-calling/STE:/home/belletti/STE-model-calling/STE
       - /home/belletti/huggingface_cache:/huggingface_cache
-      - /home/belletti/STE-model-calling/STE/results:/home/belletti/STE-model-calling/STE/results
     depends_on:
       - llm-server
