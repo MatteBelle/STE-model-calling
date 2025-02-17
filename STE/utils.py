@@ -192,5 +192,26 @@ def get_random_metric_subgroup_with_flags(json_path="tool_metadata/API_subgroups
         "optional_flags": optional_flags
     }
 
+def delete_intermediate_subfolder(subfolder_path):
+    """
+    Deletes the entire subfolder and all its contents using os.
+    """
+    try:
+        if os.path.exists(subfolder_path):
+            # Walk through the directory tree and delete files and subdirectories
+            for root, dirs, files in os.walk(subfolder_path, topdown=False):
+                for file in files:
+                    file_path = os.path.join(root, file)
+                    os.remove(file_path)  # Delete file
+                for directory in dirs:
+                    dir_path = os.path.join(root, directory)
+                    os.rmdir(dir_path)  # Delete empty directory
+            os.rmdir(subfolder_path)  # Finally, delete the main folder
+            print(f"DEBUG: Successfully deleted intermediate subfolder: {subfolder_path}")
+        else:
+            print(f"DEBUG: Subfolder does not exist: {subfolder_path}")
+    except Exception as e:
+        print(f"DEBUG: Error deleting intermediate subfolder: {e}")
+    
 if __name__ == '__main__':
     print()
