@@ -268,7 +268,7 @@ def main(
 
         data_dict[API] = all_sessions
 
-    final_data_path = os.path.join(final_dir_write, f"data_dict_{timestamp}.json")
+    final_data_path = os.path.join(final_dir_write, f"data_dict_{run_timestamp}.json")
     with open(final_data_path, "w", encoding='utf-8') as f:
         json.dump(data_dict, f)
     delete_intermediate_subfolder(subfolder_path)
