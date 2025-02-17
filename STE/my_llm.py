@@ -49,10 +49,10 @@ def get_chat_completion_my(messages, max_tokens=512, temp=0.1, return_raw=False,
     
     print(f"DEBUG-MY_LLM-LINE55: Full response before slicing:\n{response_text}")
     print(f"DEBUG-MY_LLM-LINE55: Length of prompt: {len(prompt)}")
-    print(f"DEBUG-MY_LLM-LINE55: First {len(prompt)} characters of response: {response_text[:len(prompt)]}")
+    print(f"DEBUG-MY_LLM-LINE55: First {len(prompt)} characters of response: {response_text[:len(payload['prompt'])]}")
     
     # Remove the prompt from the response
-    response_text = response_text[len(prompt):].strip()
+    response_text = response_text[len(payload['prompt']):].strip()
     print(f"DEBUG-MY_LLM-LINE55: Full response after slicing:\n{response_text}")
     
     # Apply stop condition if provided
@@ -67,6 +67,7 @@ def format_messages(messages):
     """
     formatted = ""
     for msg in messages:
+        print("DEBUG DEBUG DEBUG - ROLES: " + msg["role"])
         if msg["role"] == "system":
             formatted += f"[SYSTEM]: {msg['content']}\n"
         elif msg["role"] == "user":

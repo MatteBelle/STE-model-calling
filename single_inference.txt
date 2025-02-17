@@ -1,0 +1,20 @@
+You are an **expert** assisting in evaluation
+
+Your task is to **output a single, well-structured query** that a user might naturally ask when requesting a metric evaluation.  
+
+**Context:**
+API_name: bleu
+Description: {'description': 'BLEU (Bilingual Evaluation Understudy) is a metric for evaluating the quality of N machine translation by comparing a candidate translation against N reference translations. It computes the geometric mean of n-gram precisions with a brevity penalty to account for overly short translations. BLEU scores range from 0 to 1, with higher scores indicating closer similarity to human translations.', 'required_parameters': [{'name': 'predictions', 'type': 'LIST of STRING', 'description': 'List of translations to score', 'default': ''}, {'name': 'references', 'type': 'LIST of STRING', 'description': 'A list where each element is a list of reference translations for the corresponding prediction.', 'default': ''}], 'optional_parameters': [{'name': 'max_order', 'type': 'NUMBER', 'description': 'Maximum n-gram order to consider (default: 4).', 'default': '4'}, {'name': 'smooth', 'type': 'BOOLEAN', 'description': 'Whether to apply smoothing (default: false).', 'default': 'false'}], 'example': {'predictions': ['the cat sat on the mat', 'a quick brown fox'], 'references': [['the cat is sitting on the mat'], ['a fast brown fox jumps over the lazy dog']]}}
+
+**Task Instructions:**  
+Generate **one** realistic user query.  
+The query should be **concise, natural, and human-like**.  
+The query should **only** request metric evaluation **for a set references and predictions**.  
+It should provide parameters.
+The query should provide very creative, diverse and long references and predictions.
+Do **not** add explanations, descriptions, or metadata.  
+Do **not** repeat yourself.  
+Do **not** format the query as JSON or a code block.  
+**Stop after outputting the query.**
+
+User Query: \n
