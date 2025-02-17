@@ -10,22 +10,22 @@ HF_HOME = "/huggingface_cache"
 os.environ["HF_HOME"] = HF_HOME
 os.makedirs(HF_HOME, exist_ok=True)
 
-tokenizer = None
+# tokenizer = None
 
-def set_tokenizer(new_tokenizer):
-    """
-    Set the global tokenizer to avoid duplicate loading.
-    """
-    global tokenizer
-    tokenizer = new_tokenizer
+# def set_tokenizer(new_tokenizer):
+#     """
+#     Set the global tokenizer to avoid duplicate loading.
+#     """
+#     global tokenizer
+#     tokenizer = new_tokenizer
 
 def get_chat_completion_my(messages, max_tokens=512, temp=0.1, return_raw=False, stop=None):
     """
     Generate a response using the LLaMA model via the remote llm_server.
     This function no longer requires a local model instance.
     """
-    if tokenizer is None:
-        raise ValueError("Tokenizer has not been set. Please call set_tokenizer with a valid tokenizer.")
+    # if tokenizer is None:
+    #     raise ValueError("Tokenizer has not been set. Please call set_tokenizer with a valid tokenizer.")
     
     # Format messages using the local tokenizer for prompt formation
     prompt = format_messages(messages)

@@ -5,7 +5,7 @@ import numpy as np
 import time
 import fire
 from transformers import pipeline  # Import Hugging Face pipeline
-from utils import find_reverse, random_choose, parse_response, strip_end#, get_random_metric_subgroup_with_flags
+from utils import find_reverse, random_choose, parse_response, strip_end, delete_intermediate_subfolder#, get_random_metric_subgroup_with_flags
 from my_llm import chat_my, visualize_messages, get_chat_completion_my, set_tokenizer
 # Load the LLaMA 2 model and tokenizer, using the cache
 from transformers import AutoTokenizer, AutoModelForCausalLM
@@ -27,37 +27,37 @@ def main(
     print(f"DEBUG: model_ckpt={model_ckpt}, num_episodes={num_episodes}, num_stm_slots={num_stm_slots}, max_turn={max_turn}, final_dir_write={final_dir_write}, if_visualize={if_visualize}")
 
     # ----------------------------------------------
-    print("DEBUG: Setting HF_HOME environment variable and creating cache directory if it does not exist.")
-    HF_HOME = "/huggingface_cache"
-    os.environ["HF_HOME"] = HF_HOME  # Ensure the environment variable is set
-    # Create the cache directory if it doesn't exist
-    os.makedirs(HF_HOME, exist_ok=True)
-
-    MODEL_NAME = "meta-llama/Meta-Llama-3-8B-Instruct"
-    print("DEBUG: Initializing tokenizer from MODEL_NAME.")
-    tokenizer = AutoTokenizer.from_pretrained(MODEL_NAME, cache_dir=HF_HOME)
-    tokenizer.add_special_tokens({"pad_token": "<PAD>"})
-    # print("DEBUG: Initializing model from MODEL_NAME.")
-    # model = AutoModelForCausalLM.from_pretrained(
-    #     MODEL_NAME, 
-    #     torch_dtype=torch.float16,
-    #     device_map="auto", 
-    #     cache_dir=HF_HOME
-    # )
-    # print(f"Model and tokenizer loaded successfully. Cached at {HF_HOME}")
+    # HF_HOME = "/huggingface_cache"
+    # os.environ["HF_HOME"] = HF_HOME  # Ensure the environment variable is set
+    # # Create the cache directory if it doesn't exist
+    # os.makedirs(HF_HOME, exist_ok=True)
+    # MODEL_NAME = "meta-llama/Meta-Llama-3-8B-Instruct"
+    # print("DEBUG: Initializing tokenizer from MODEL_NAME.")
+    # tokenizer = AutoTokenizer.from_pretrained(MODEL_NAME, cache_dir=HF_HOME)
+    # tokenizer.add_special_tokens({"pad_token": "<PAD>"})
     # ----------------------------------------------
-    # Set the global tokenizer to avoid duplicate loading
-    from my_llm import set_tokenizer
-    set_tokenizer(tokenizer)
-    
+    #set_tokenizer(tokenizer)
+    # ---------------------------------------------- Create env for saving results
+    print("DEBUG: Ensuring output directories exists.")
+    os.makedirs(final_dir_write, exist_ok=True)
+    os.makedirs(intermediate_dir_write, exist_ok=True)
+    data_dict = dict()
+    # Create a unique subfolder inside intermediate_dir_write
+    run_timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    subfolder_path = os.path.join(intermediate_dir_write, f"run_{run_timestamp}")
+    # Ensure the subfolder exists inside intermediate_dir_write
+    os.makedirs(subfolder_path, exist_ok=True)
+    # Save the subfolder name for later use (optional)
+    subfolder_info_path = os.path.join(intermediate_dir_write, "latest_run_subfolder.txt")
+    with open(subfolder_info_path, "w") as f:
+        f.write(subfolder_path)
+    print(f"DEBUG: Intermediate results will be stored in: {subfolder_path}")
+    # ----------------------------------------------
     print("DEBUG: Loading API descriptions and API list from JSON files.")
     with open("STE/tool_metadata/API_descriptions.json", "r", encoding='utf-8') as f:
         API_descriptions = json.load(f)
-
     with open("STE/tool_metadata/API_list.json", "r", encoding='utf-8') as f:
         API_list = json.load(f)
-
-    # (The unused hf_pipeline variable has been removed.)
 
     def run_evaluation(metric_name, args, truncate=False):
         """
@@ -65,18 +65,15 @@ def main(
         """
         if metric_name not in API_list:
             raise ValueError(f"Metric '{metric_name}' is not supported. Supported metrics are: {API_list}")
-        
         try:
             # Normalize the input arguments using the metadata.
             print(f"DEBUG: Normalizing evaluation arguments for metric '{metric_name}'")
             print(f"DEBUG: Arguments before normalization: {args}")
             normalized_args = normalize_evaluation_args(metric_name, args, API_descriptions)
             print("DEBUG: EVALUATIONEVALUATIONEVALUATIONEVALUATION: NORMALIZED ARGS = " + str(normalized_args))
-            # Load the metric (this uses the default/cached model/tokenizer as defined in the metric's implementation)
             metric = evaluate.load(metric_name)
             # Compute the metric using the normalized arguments.
             result = metric.compute(**normalized_args)
-            
             print("DEBUG: EVALUATIONEVALUATIONEVALUATIONEVALUATION RESULT = " + str(result))
             result_str = json.dumps(result)
             print("DEBUG: EVALUATIONEVALUATIONEVALUATIONEVALUATION RESULT JSONED = " + str(result_str))
@@ -91,11 +88,6 @@ def main(
     PAST_Q_MSG_pre = "Below are queries you have already explored and whether you successfully solved them with the API's help:"
     PAST_Q_MSG_post = "Based on these, try to explore queries that can help you understand the API further; avoid synthesizing queries that are too close to the existing ones."
     prompt_reflection = "Do you think you successfully fulfilled this query in the end? Respond with \"Yes\" or \"No\"."
-
-    print("DEBUG: Ensuring output directory exists.")
-    os.makedirs(final_dir_write, exist_ok=True)
-    os.makedirs(intermediate_dir_write, exist_ok=True)
-    data_dict = dict()
 
     print("DEBUG: Starting iteration over API_list.")
     for API in API_list:
@@ -263,7 +255,6 @@ def main(
                 else:
                     successful = "Yes"
                 whether_successful.append(successful)
-
                 item_list.append(item)
 
             all_sessions.append(
@@ -272,26 +263,15 @@ def main(
                     "messages": messages,
                 }
             )
-
-            # Save intermediate / intermediate results right after each session
-            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S_%f")
-            intermediate_filename = os.path.join(intermediate_dir_write, f"intermediate_{API}_session_{session_id}_{timestamp}.json")
-            try:
-                with open(intermediate_filename, "w", encoding='utf-8') as f:
-                    json.dump({
-                        "API": API,
-                        "session_id": session_id,
-                        "all_sessions_so_far": all_sessions
-                    }, f, ensure_ascii=False, indent=2)
-                print(f"DEBUG: Intermediate results saved to {intermediate_filename}")
-            except Exception as e:
-                print(f"DEBUG: Error saving intermediate results: {e}")
+            # Save intermediate results right after each session
+            save_intermediate_results(API, session_id, all_sessions, subfolder_path)
 
         data_dict[API] = all_sessions
 
     final_data_path = os.path.join(final_dir_write, f"data_dict_{timestamp}.json")
     with open(final_data_path, "w", encoding='utf-8') as f:
         json.dump(data_dict, f)
+    delete_intermediate_subfolder(subfolder_path)
     print(f"DEBUG: Final data saved to {final_data_path}")
     print("DEBUG: Finished main function.")
 
@@ -304,6 +284,7 @@ def LTM(X, labels):
     except AssertionError:
         print(f"DEBUG: Assertion failed! len(X) == len(labels) '. len(X) {len(X)}, len(labels) {len(labels)}")
         raise  # Re-raise the exception after logging
+    print("DEBUG: LTMLTM: " + str(["Query: {} \n Solved: {}".format(X[i], labels[i]) for i in range(len(X))]))
     return ["Query: {} \n Solved: {}".format(X[i], labels[i]) for i in range(len(X))]
 
 def normalize_evaluation_args(metric_name, args, API_descriptions):
@@ -375,8 +356,27 @@ def normalize_evaluation_args(metric_name, args, API_descriptions):
             except Exception as e:
                 print(f"DEBUG: Error normalizing parameter '{key}' with value '{value}': {e}")
                 normalized_args[key] = value
-                
     return normalized_args
+
+def save_intermediate_results(API, session_id, all_sessions, subfolder_path):
+    """
+    Saves intermediate results in the dynamically created subfolder inside intermediate_dir_write.
+    """
+    try:
+        # Generate a timestamp for each session
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S_%f")
+        intermediate_filename = os.path.join(subfolder_path, f"intermediate_{API}_session_{session_id}_{timestamp}.json")
+
+        with open(intermediate_filename, "w", encoding="utf-8") as f:
+            json.dump({
+                "API": API,
+                "session_id": session_id,
+                "all_sessions_so_far": all_sessions
+            }, f, ensure_ascii=False, indent=2)
+
+        print(f"DEBUG: Intermediate results saved to {intermediate_filename}")
+    except Exception as e:
+        print(f"DEBUG: Error saving intermediate results: {e}")
 
 if __name__ == '__main__':
     fire.Fire(main)
