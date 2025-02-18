@@ -6,8 +6,7 @@ import time
 import fire
 from transformers import pipeline  # Import Hugging Face pipeline
 from utils import find_reverse, random_choose, parse_response, strip_end, delete_intermediate_subfolder#, get_random_metric_subgroup_with_flags
-from my_llm import chat_my, visualize_messages, get_chat_completion_my, set_tokenizer
-# Load the LLaMA 2 model and tokenizer, using the cache
+from my_llm import chat_my, visualize_messages, get_chat_completion_my#, set_tokenizer
 from transformers import AutoTokenizer, AutoModelForCausalLM
 import torch
 from datetime import datetime  # For generating dynamic filenames
@@ -15,7 +14,7 @@ import evaluate
 import random
 
 def main(
-    model_ckpt: str = 'meta-llama/Meta-Llama-3-8B-Instruct',  # Updated to use LLaMA-2
+    model_ckpt: str = 'meta-llama/Meta-Llama-3-8B-Instruct',
     num_episodes: int = 15,
     num_stm_slots: int = 3,
     max_turn: int = 4,
