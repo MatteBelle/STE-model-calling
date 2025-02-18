@@ -10,35 +10,24 @@ HF_HOME = "/huggingface_cache"
 os.environ["HF_HOME"] = HF_HOME
 os.makedirs(HF_HOME, exist_ok=True)
 
-# tokenizer = None
-
-# def set_tokenizer(new_tokenizer):
-#     """
-#     Set the global tokenizer to avoid duplicate loading.
-#     """
-#     global tokenizer
-#     tokenizer = new_tokenizer
-
 def get_chat_completion_my(messages, max_tokens=512, temp=0.1, return_raw=False, stop=None):
-    """
-    Generate a response using the LLaMA model via the remote llm_server.
-    This function no longer requires a local model instance.
-    """
-    # if tokenizer is None:
-    #     raise ValueError("Tokenizer has not been set. Please call set_tokenizer with a valid tokenizer.")
-    
-    # Format messages using the local tokenizer for prompt formation
+    # Build the prompt as before.
     prompt = format_messages(messages)
-    print("DEBUG: Formatted prompt:", prompt)
     
-    # Prepare payload for the llm_server
+    # Append a unique delimiter to clearly separate prompt from generation.
+    delimiter = "\n<|startofresponse|>\n"
+    full_prompt = prompt + delimiter
+    print("DEBUG: Formatted prompt with delimiter:", full_prompt)
+    
+    # Prepare payload using the full prompt (with delimiter).
     server_url = os.environ.get("MODEL_SERVER_URL", "http://localhost:8000/generate")
     payload = {
-        "prompt": prompt,
+        "prompt": full_prompt,
         "max_tokens": max_tokens,
         "temperature": temp
     }
     print("DEBUG: Sending payload to LLM server:", payload)
+    
     try:
         response = requests.post(server_url, json=payload)
         response_json = response.json()
@@ -47,15 +36,20 @@ def get_chat_completion_my(messages, max_tokens=512, temp=0.1, return_raw=False,
         print("ERROR: Failed to get response from LLM server:", e)
         response_text = ""
     
-    print(f"DEBUG-MY_LLM-LINE55: Full response before slicing:\n{response_text}")
+    print(f"DEBUG-MY_LLM: Full response before splitting:\n{response_text}")
     print(f"DEBUG-MY_LLM-LINE55: Length of prompt: {len(prompt)}")
-    print(f"DEBUG-MY_LLM-LINE55: First {len(prompt)} characters of response: {response_text[:len(payload['prompt'])]}")
+    print(f"DEBUG-MY_LLM-LINE55: Length of response: {len(response_text)}")
     
-    # Remove the prompt from the response
-    response_text = response_text[len(payload['prompt']):].strip()
-    print(f"DEBUG-MY_LLM-LINE55: Full response after slicing:\n{response_text}")
+    # Now remove everything up to (and including) the delimiter.
+    if delimiter in response_text:
+        response_text = response_text.split(delimiter, 1)[1].strip()
+    else:
+        # Fallback if the delimiter is not found.
+        response_text = response_text[len(full_prompt):].strip()
     
-    # Apply stop condition if provided
+    print(f"DEBUG-MY_LLM: Full response after splitting:\n{response_text}")
+    
+    # Apply stop condition if provided.
     if stop and stop in response_text:
         response_text = response_text.split(stop)[0].strip()
     

@@ -17,9 +17,11 @@ print("DEBUG (Server): Initializing model from MODEL_NAME.")
 model = AutoModelForCausalLM.from_pretrained(
     MODEL_NAME,
     torch_dtype=torch.float16,
-    device_map="auto",
+    #device_map="auto",
+    device_map="cuda",
     cache_dir=HF_HOME
 )
+model.resize_token_embeddings(len(tokenizer))
 print(f"DEBUG (Server): Model and tokenizer loaded successfully. Cached at {HF_HOME}")
 
 app = FastAPI()
@@ -34,7 +36,8 @@ class InferenceRequest(BaseModel):
 async def generate_text(request: InferenceRequest):
     try:
         # Tokenize the provided prompt (which is already formatted by the client)
-        inputs = tokenizer(request.prompt, return_tensors="pt").to(model.device)
+        #inputs = tokenizer(request.prompt, return_tensors="pt").to(model.device)
+        inputs = tokenizer(request.prompt, return_tensors="pt").to("cuda")
         token_ids = inputs.input_ids[0].tolist()
         print("DEBUG (Server): Prompt length (tokens):", len(token_ids))
         
