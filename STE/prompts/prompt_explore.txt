@@ -8,7 +8,8 @@ Generate **one** realistic user query.
 The query should be **concise, natural, and human-like**.  
 The query should **only** request metric evaluation **for a set references and predictions**.  
 It should provide parameters.   
-The query should provide very creative, diverse and long references and predictions.   
+The query should provide creative and diverse references and predictions.  
+**References and prediction lists must have the same number of elements** 
 Do **not** add explanations, descriptions, or metadata.  
 Do **not** repeat yourself.  
 Do **not** format the query as JSON or a code block.  
@@ -19,7 +20,7 @@ User Query:
 
 Now, try to respond to the query using the available evaluation metrics.
 
-The format you use for the evaluation metric is by specifying 1) Action: the name of the metric you want to call 2) Action Input: the input parameters for the metric in a JSON string format such that predictions and references have the same number of entries in their lists. The result of the metric call will be returned starting with "Evaluation Result:". Remember that you should only perform a SINGLE action at a time; do NOT return a list of multiple actions.
+The format you use for the evaluation metric is by specifying 1) Action: the name of the metric you want to call 2) Action Input: the input parameters for the metric in a JSON string format such that predictions and references have the same number of entries in their lists. The result of the metric call will be returned starting with "Evaluation Result". Remember that you should only perform a SINGLE action at a time; do NOT return a list of multiple actions.
 
 Reminder:
 1) The only values that should follow "Action:" are: {metric_name}
@@ -37,7 +38,7 @@ Remember to ALWAYS use the following format:
 Thought: you should always think about what to do next  
 Action: the evaluation metric name  
 Action Input: the input parameters for the metric function in JSON string format  
-Evaluation Result: the return result of the evaluation function. This is what I will provide you with; you do not need to repeat it in your response.  
+Evaluation Result: the return result of the evaluation function. This is what I will provide you with;
 ... (this Thought/Action/Action Input/Evaluation Result cycle can repeat N times)  
 Thought: I now know the final answer  
 Final Answer: the response to the user query and some considerations on the result
@@ -50,7 +51,7 @@ User Query (the same you just synthesized): {query}
 
 Now you know a bit more about the available evaluation metrics. You can synthesize another user query to explore the metrics further and consolidate your understanding based on what you discovered. Again, just input the user query alone; do NOT solve the query for now.
 
-Generate one new User Query:
+User Query:
 
 =========
 

@@ -10,23 +10,26 @@ HF_HOME = "/huggingface_cache"
 os.environ["HF_HOME"] = HF_HOME
 os.makedirs(HF_HOME, exist_ok=True)
 
-def get_chat_completion_my(messages, max_tokens=512, temp=0.1, return_raw=False, stop=None):
-    # Build the prompt as before.
-    prompt = format_messages(messages)
+def get_chat_completion_my(messages, max_tokens=512, temp=0.4, return_raw=False, stop=None):
+    """
+    Generate a response using the LLaMA model via the llm_server.
+    This function builds the prompt following the ChatFormat guidelines for llama3-8B.
+    """
+    # Build the formatted prompt using the new ChatFormat
+    # prompt = format_messages(messages)
     
-    # Append a unique delimiter to clearly separate prompt from generation.
-    delimiter = "\n<|startofresponse|>\n"
-    full_prompt = prompt + delimiter
-    print("DEBUG: Formatted prompt with delimiter:", full_prompt)
+    # # Append the assistant header to signal that the assistant should now respond.
+    # assistant_header = "<|start_header_id|> assistant <|end_header_id|>\n\n"
+    # full_prompt = prompt + assistant_header
+    # print("DEBUG: Formatted prompt with assistant header:", full_prompt)
     
-    # Prepare payload using the full prompt (with delimiter).
     server_url = os.environ.get("MODEL_SERVER_URL", "http://localhost:8000/generate")
     payload = {
-        "prompt": full_prompt,
+        #"prompt": full_prompt,
+        "prompt": messages,
         "max_tokens": max_tokens,
         "temperature": temp
     }
-    print("DEBUG: Sending payload to LLM server:", payload)
     
     try:
         response = requests.post(server_url, json=payload)
@@ -36,38 +39,52 @@ def get_chat_completion_my(messages, max_tokens=512, temp=0.1, return_raw=False,
         print("ERROR: Failed to get response from LLM server:", e)
         response_text = ""
     
-    print(f"DEBUG-MY_LLM: Full response before splitting:\n{response_text}")
-    print(f"DEBUG-MY_LLM-LINE55: Length of prompt: {len(prompt)}")
-    print(f"DEBUG-MY_LLM-LINE55: Length of response: {len(response_text)}")
+    #print(f"DEBUG-MY_LLM: Full response before processing:\n{response_text}")
     
-    # Now remove everything up to (and including) the delimiter.
-    if delimiter in response_text:
-        response_text = response_text.split(delimiter, 1)[1].strip()
+    # Remove the prompt part from the generated text.
+    # if response_text.startswith(full_prompt):
+    #     response_text = response_text[len(full_prompt):].strip()
+    # else:
+    #     # Fallback: if the full prompt is not found, split by the eot token.
+    #     parts = response_text.split("<|eot_id|>") #FAKE: IN SERVER I ALREADY USE skip_special_tokens=True
+    #     if parts:
+    #         response_text = parts[0].strip()
+    # Fallback: if the full prompt is not found, split by the eot token.
+    #parts = response_text.split("<|eot_id|>")
+    
+    # Remove the prompt from the answer (cut from the head)
+    parts = response_text.split("<|promptends|>")
+    if parts:
+        response_text = parts[1].strip()
     else:
-        # Fallback if the delimiter is not found.
-        response_text = response_text[len(full_prompt):].strip()
+        print("DEBUG ERROR: <|promptends|> not found")
     
-    print(f"DEBUG-MY_LLM: Full response after splitting:\n{response_text}")
-    
-    # Apply stop condition if provided.
+    # Remove the prompt from the answer (cut from the head)
     if stop and stop in response_text:
         response_text = response_text.split(stop)[0].strip()
+    
+    # Remove any stray tokens (for instance, <|endofresponse|>) ----> FAKE: IN SERVER I ALREADY USE skip_special_tokens=True
+    #response_text = response_text.replace("<|endofresponse|>", "").strip()
     
     return response_text if not return_raw else {"response": response_text}
 
 def format_messages(messages):
     """
-    Format messages in a chat-friendly manner.
+    Format messages according to Llama3-8B ChatFormat.
+    The format is:
+      <|begin_of_text|>
+      <|start_header_id|> role <|end_header_id|>
+      
+      message content <|eot_id|>
+      (repeat for each message)
     """
-    formatted = ""
-    for msg in messages:
-        print("DEBUG DEBUG DEBUG - ROLES: " + msg["role"])
-        if msg["role"] == "system":
-            formatted += f"[SYSTEM]: {msg['content']}\n"
-        elif msg["role"] == "user":
-            formatted += f"[USER]: {msg['content']}\n"
-        elif msg["role"] == "assistant":
-            formatted += f"[ASSISTANT]: {msg['content']}\n"
+    # formatted = "<|begin_of_text|>\n"
+    # for msg in messages:
+    #     role = msg["role"].lower()  # ensure the role is in lower case if needed
+    #     # Add header for the message
+    #     formatted += f"<|start_header_id|> {role} <|end_header_id|>\n\n"
+    #     # Add the message content and mark end of message
+    #     formatted += f"{msg['content']} <|eot_id|>\n"
     return formatted
 
 def visualize_messages(messages):
@@ -78,21 +95,23 @@ def visualize_messages(messages):
     for entry in messages:
         assert entry['role'] in role2color.keys()
         if entry['content'].strip() != "":
-            print("GENERATED RESPONSE BEGINS: ----------------------")
-            print(colored(entry['content'], role2color[entry['role']]))
-            print("GENERATED RESPONSE ENDS: ----------------------")
+            #print("GENERATED RESPONSE BEGINS: ----------------------")
+            a=1
+            #print(colored(entry['content'], role2color[entry['role']]))
+            #print("GENERATED RESPONSE ENDS: ----------------------")
         else:
-            print("GENERATED RESPONSE BEGINS: ----------------------")
+            #print("GENERATED RESPONSE BEGINS: ----------------------")
             print(colored("<no content>", role2color[entry['role']]))
-            print("GENERATED RESPONSE ENDS: ----------------------")
+            #print("GENERATED RESPONSE ENDS: ----------------------")
 
 def chat_my(messages, new_message, visualize=True, **params):
     messages = deepcopy(messages)
-    messages.append({"role": "user", "content": new_message})
+    messages.append({"role": "user", "content": new_message + "<|promptends|>"})
     # Call get_chat_completion_my without passing model
     response = get_chat_completion_my(messages, **params)
+    messages[-1]["content"] = messages[-1]["content"].replace("<|promptends|>", "").strip()
     messages.append({"role": "assistant", "content": response})
-    print("DEBUG CHAT MY, RESPONSE: " + response)
+    #print("DEBUG CHAT MY, RESPONSE: " + response)
     if visualize:
         visualize_messages(messages[-2:])
     return messages

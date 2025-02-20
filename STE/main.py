@@ -22,20 +22,9 @@ def main(
     final_dir_write: str = "STE/results/final_results/",
     if_visualize: bool = True,
 ):
+    temp=0.5
     print("DEBUG: Entering main function with parameters:")
     print(f"DEBUG: model_ckpt={model_ckpt}, num_episodes={num_episodes}, num_stm_slots={num_stm_slots}, max_turn={max_turn}, final_dir_write={final_dir_write}, if_visualize={if_visualize}")
-
-    # ----------------------------------------------
-    # HF_HOME = "/huggingface_cache"
-    # os.environ["HF_HOME"] = HF_HOME  # Ensure the environment variable is set
-    # # Create the cache directory if it doesn't exist
-    # os.makedirs(HF_HOME, exist_ok=True)
-    # MODEL_NAME = "meta-llama/Meta-Llama-3-8B-Instruct"
-    # print("DEBUG: Initializing tokenizer from MODEL_NAME.")
-    # tokenizer = AutoTokenizer.from_pretrained(MODEL_NAME, cache_dir=HF_HOME)
-    # tokenizer.add_special_tokens({"pad_token": "<PAD>"})
-    # ----------------------------------------------
-    #set_tokenizer(tokenizer)
     # ---------------------------------------------- Create env for saving results
     print("DEBUG: Ensuring output directories exists.")
     os.makedirs(final_dir_write, exist_ok=True)
@@ -58,31 +47,6 @@ def main(
     with open("STE/tool_metadata/API_list.json", "r", encoding='utf-8') as f:
         API_list = json.load(f)
 
-    def run_evaluation(metric_name, args, truncate=False):
-        """
-        Execute an evaluation metric from Hugging Face evaluate.
-        """
-        if metric_name not in API_list:
-            raise ValueError(f"Metric '{metric_name}' is not supported. Supported metrics are: {API_list}")
-        try:
-            # Normalize the input arguments using the metadata.
-            print(f"DEBUG: Normalizing evaluation arguments for metric '{metric_name}'")
-            print(f"DEBUG: Arguments before normalization: {args}")
-            normalized_args = normalize_evaluation_args(metric_name, args, API_descriptions)
-            print("DEBUG: EVALUATIONEVALUATIONEVALUATIONEVALUATION: NORMALIZED ARGS = " + str(normalized_args))
-            metric = evaluate.load(metric_name)
-            # Compute the metric using the normalized arguments.
-            result = metric.compute(**normalized_args)
-            print("DEBUG: EVALUATIONEVALUATIONEVALUATIONEVALUATION RESULT = " + str(result))
-            result_str = json.dumps(result)
-            print("DEBUG: EVALUATIONEVALUATIONEVALUATIONEVALUATION RESULT JSONED = " + str(result_str))
-            if truncate:
-                result_str = result_str[:truncate]
-            return result_str
-        except Exception as e:
-            print("DEBUG ERROR IN EVALUATIONEVALUATIONEVALUATIONEVALUATION: " + str(e))
-            return f"Error in run_evaluation: {str(e)}"
-
     # Memory and reflection prompts (unchanged)
     PAST_Q_MSG_pre = "Below are queries you have already explored and whether you successfully solved them with the API's help:"
     PAST_Q_MSG_post = "Based on these, try to explore queries that can help you understand the API further; avoid synthesizing queries that are too close to the existing ones."
@@ -101,7 +65,7 @@ def main(
         template_q, template_a, template_q_follow, template_a_follow = template_q.strip(), template_a.strip(), template_q_follow.strip(), template_a_follow.strip() #TOCHECK 15/02
 
         all_sessions, explored_queries, whether_successful = [], [], []
-
+        # LOOP on the SAME API with the SAME MEMORY --> num_episodes
         for session_id in range(num_episodes):
             print("DEBUG: Starting episode:", session_id)
             item_list = []
@@ -132,12 +96,15 @@ def main(
 
             print("DEBUG: Generating the first query using chat_my.")
             response = chat_my(messages, prompt_q_added_question,
-                               temp=0.2, stop="Thought:", visualize=if_visualize, max_tokens=512)[-1]['content']
+                               temp=temp, stop="Thought:", visualize=if_visualize, max_tokens=512)[-1]['content']
 
             messages = messages + [
                 {"role": "user", "content": prompt_q},
                 {"role": "assistant", "content": response}
             ]
+            print("DEBUG FIRST USER QUERY OF SESSION " + str(session_id) +  ": \n" + messages[-2]['content']+"\n\n\n\n")
+            print("DEBUG FIRST RESPONSE OF SESSION ------------------------------------------------------" + str(session_id) +  ": \n" + response)
+            print("DEBUG END: --------------------------------------------------------------------------------------------------------------\n\n\n\n\n\n\n\n")
 
             query = messages[-1]['content']
             prompt_a = template_a.format(
@@ -149,25 +116,37 @@ def main(
 
             chains = []
             print("DEBUG: Processing chain of calls for the first query.")
-            messages = chat_my(messages, prompt_a, temp=0.2, stop="Evaluation Result:", visualize=if_visualize, max_tokens=512)
+            messages = chat_my(messages, prompt_a, temp=temp, stop="Evaluation Result:", visualize=if_visualize, max_tokens=512)            
             temp = messages[-1]['content']
+            
+            print("DEBUG FIRST USER ANSWER OF SESSION " + str(session_id) +  ": \n" + messages[-2]['content'] +"\n\n\n\n")
+            print("DEBUG FIRST ACTION AND INPUT OF SESSION ------------------------------------------------------" + str(session_id) +  ": \n" + temp)
+            print("DEBUG END: --------------------------------------------------------------------------------------------------------------\n\n\n\n\n\n\n\n")
+            
             parsed_response = parse_response(temp, API_name_list, API_descriptions)
-            for _ in range(max_turn):
+            # LOOP on the SAME API ACTION AND ACTION INPUT UNTIL THEY ARE CORRECT with the SAME MEMORY UNTIL SUCCESFUL --> max_turn
+            for n_turn in range(max_turn):
                 if not parsed_response['parse_successful']:
                     evaluation_result = parsed_response['parse_error_msg']
                 else:
                     if parsed_response['finish']:
-                        print("DEBUGDEBUGDEBUG: MAIN RICONOSCE CHE LA TASK E' FINITA, PROSSIMO TURNO CON PROMPT DIVERSO")
+                        print("DEBUGDEBUGDEBUG: MAIN RICONOSCE CHE LA TASK E' FINITA, PROSSIMO EPISODE")
                         chains.append(parsed_response)
                         break
                     else:
-                        evaluation_result = run_evaluation(parsed_response['action'], parsed_response['action_input'])
+                        evaluation_result = run_evaluation(parsed_response['action'], parsed_response['action_input'], API_list, API_descriptions)
                 parsed_response['evaluation_result'] = evaluation_result
                 chains.append(parsed_response)
 
                 messages = chat_my(messages, "Evaluation Result: "+ evaluation_result,
-                                   temp=0.2, stop="Evaluation Result:", visualize=if_visualize, max_tokens=512)
+                                   temp=temp, stop="Evaluation Result:", visualize=if_visualize, max_tokens=512)
+
                 temp = messages[-1]['content']
+                
+                print("DEBUG USER QUERY OF SESSION " + str(session_id) + ", TURN " + str(n_turn) + ", PARSING ACTION AND INPUT: \n" + messages[-2]['content'] + "\n\n\n\n")
+                print("DEBUG RESPONSE OF SESSION ------------------------------------------------------" + str(session_id) + ", TURN " + str(n_turn) + ", PARSING ACTION AND INPUT: \n" + temp)
+                print("DEBUG END: --------------------------------------------------------------------------------------------------------------\n\n\n\n\n\n\n\n")
+                
                 parsed_response = parse_response(temp, API_name_list, API_descriptions)
 
             if len(chains) == 0 or not chains[-1]['finish']:
@@ -176,8 +155,12 @@ def main(
             first_item['chains'] = chains
 
             print("DEBUG: Running reflection to determine success for the first query.")
-            messages = chat_my(messages, prompt_reflection, temp=0.2, stop="Evaluation Result:", visualize=if_visualize, max_tokens=512)
+            messages = chat_my(messages, prompt_reflection, temp=temp, stop="Evaluation Result:", visualize=if_visualize, max_tokens=512)
             res = messages[-1]['content']
+            print("DEBUG USER QUERY REFLECTION OF SESSION " + str(session_id) + ", TURN " + str(n_turn) + ": \n" + messages[-2]['content'] + "\n\n\n\n")
+            print("DEBUG RESPONSE OF SESSION ------------------------------------------------------" + str(session_id) + ", TURN " + str(n_turn) + ": \n" + res)
+            print("DEBUG END: --------------------------------------------------------------------------------------------------------------\n\n\n\n\n\n\n\n")
+            
             if "No" in res:
                 successful = "No"
             else:
@@ -187,7 +170,7 @@ def main(
 
             item_list.append(first_item)
 
-            for _ in range(num_stm_slots-1):
+            for n_stm in range(num_stm_slots-1):
                 item = dict()
 
                 if len(explored_queries) > 0:
@@ -207,12 +190,14 @@ def main(
 
                 print("DEBUG: Generating follow-up query using chat_my.")
                 response = chat_my(messages, template_q_follow_added_question,
-                                   temp=0.2, stop="Thought:", visualize=if_visualize, max_tokens=512)[-1]['content']
+                                   temp=temp, stop="Thought:", visualize=if_visualize, max_tokens=512)[-1]['content']
                 messages = messages + [
                     {"role": "user", "content": template_q_follow},
                     {"role": "assistant", "content": response}
                 ]
-
+                print("DEBUG USER QUERY REFLECTION OF SESSION " + str(session_id) + ", STM TURN " + str(n_stm) + ": \n" + messages[-2]['content'] + "\n\n\n\n")
+                print("DEBUG RESPONSE OF SESSION ------------------------------------------------------" + str(session_id) + ", STM TURN " + str(n_stm) + ": \n" + response)
+                print("DEBUG END: --------------------------------------------------------------------------------------------------------------\n\n\n\n\n\n\n\n")
                 query = messages[-1]['content']
                 item['query'] = query
                 explored_queries.append(query)
@@ -220,10 +205,10 @@ def main(
                 chains = []
                 print("DEBUG: Processing chain of calls for the short-term memory slot query.")
                 messages = chat_my(messages, template_a_follow,
-                                   temp=0.2, stop="Evaluation Result:", visualize=if_visualize, max_tokens=512)
+                                   temp=temp, stop="Evaluation Result:", visualize=if_visualize, max_tokens=512)
                 temp = messages[-1]['content']
                 parsed_response = parse_response(temp, API_name_list, API_descriptions)
-                for _ in range(max_turn):
+                for n_turn in range(max_turn):
                     if not parsed_response['parse_successful']:
                         evaluation_result = parsed_response['parse_error_msg']
                     else:
@@ -231,13 +216,16 @@ def main(
                             chains.append(parsed_response)
                             break
                         else:
-                            evaluation_result = run_evaluation(parsed_response['action'], parsed_response['action_input'])
+                            evaluation_result = run_evaluation(parsed_response['action'], parsed_response['action_input'], API_list, API_descriptions)
                     parsed_response['evaluation_result'] = evaluation_result
                     chains.append(parsed_response)
 
                     messages = chat_my(messages, "Evaluation Result: "+ evaluation_result,
-                                       temp=0.2, stop="Evaluation Result:", visualize=if_visualize, max_tokens=512)
+                                       temp=temp, stop="Evaluation Result:", visualize=if_visualize, max_tokens=512)
                     temp = messages[-1]['content']
+                    print("DEBUG USER QUERY OF SESSION " + str(session_id) + ", TURN " + str(n_turn) + ", PARSING ACTION AND INPUT: \n" + messages[-2]['content'] + "\n\n\n\n")
+                    print("DEBUG RESPONSE OF SESSION ------------------------------------------------------" + str(session_id) + ", TURN " + str(n_turn) + ", PARSING ACTION AND INPUT: \n" + temp)
+                    print("DEBUG END: --------------------------------------------------------------------------------------------------------------\n\n\n\n\n\n\n\n")
                     parsed_response = parse_response(temp, API_name_list, API_descriptions)
 
                 if len(chains) == 0 or not chains[-1]['finish']:
@@ -247,8 +235,11 @@ def main(
 
                 print("DEBUG: Running reflection to determine success for the short-term memory slot query.")
                 messages = chat_my(messages, prompt_reflection,
-                                   temp=0.2, stop="Evaluation Result:", visualize=if_visualize, max_tokens=512)
+                                   temp=temp, stop="Evaluation Result:", visualize=if_visualize, max_tokens=512)
                 res = messages[-1]['content']
+                print("DEBUG USER QUERY REFLECTION OF SESSION " + str(session_id) + ", TURN " + str(n_turn) + ": \n" + messages[-2]['content'] + "\n\n\n\n")
+                print("DEBUG RESPONSE OF SESSION ------------------------------------------------------" + str(session_id) + ", TURN " + str(n_turn) + ": \n" + res)
+                print("DEBUG END: --------------------------------------------------------------------------------------------------------------\n\n\n\n\n\n\n\n")
                 if "No" in res:
                     successful = "No"
                 else:
@@ -356,6 +347,32 @@ def normalize_evaluation_args(metric_name, args, API_descriptions):
                 print(f"DEBUG: Error normalizing parameter '{key}' with value '{value}': {e}")
                 normalized_args[key] = value
     return normalized_args
+
+
+def run_evaluation(metric_name, args, API_list, API_descriptions, truncate=False):
+    """
+    Execute an evaluation metric from Hugging Face evaluate.
+    """
+    if metric_name not in API_list:
+        raise ValueError(f"Metric '{metric_name}' is not supported. Supported metrics are: {API_list}")
+    try:
+        # Normalize the input arguments using the metadata.
+        print(f"DEBUG: Normalizing evaluation arguments for metric '{metric_name}'")
+        print(f"DEBUG: Arguments before normalization: {args}")
+        normalized_args = normalize_evaluation_args(metric_name, args, API_descriptions)
+        print("DEBUG: EVALUATIONEVALUATIONEVALUATIONEVALUATION: NORMALIZED ARGS = " + str(normalized_args))
+        metric = evaluate.load(metric_name)
+        # Compute the metric using the normalized arguments.
+        result = metric.compute(**normalized_args)
+        print("DEBUG: EVALUATIONEVALUATIONEVALUATIONEVALUATION RESULT = " + str(result))
+        result_str = json.dumps(result)
+        print("DEBUG: EVALUATIONEVALUATIONEVALUATIONEVALUATION RESULT JSONED = " + str(result_str))
+        if truncate:
+            result_str = result_str[:truncate]
+        return result_str
+    except Exception as e:
+            print("DEBUG ERROR IN EVALUATIONEVALUATIONEVALUATIONEVALUATION: " + str(e))
+            return f"Error in run_evaluation: {str(e)}"
 
 def save_intermediate_results(API, session_id, all_sessions, subfolder_path):
     """

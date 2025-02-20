@@ -9,9 +9,8 @@ services:
         reservations:
           devices:
             - driver: nvidia
-              #count: 1
+              count: 1
               capabilities: [gpu]
-              device_ids: ['2']
     environment:
       - HF_HOME=/huggingface_cache
       - HUGGING_FACE_HUB_TOKEN=<YOUR_HUGGING_FACE_HUB_TOKEN>
@@ -31,15 +30,14 @@ services:
         reservations:
           devices:
             - driver: nvidia
-              #count: 1
+              count: 1
               capabilities: [gpu]
-              device_ids: ['2']
     environment:
       - HF_HOME=/huggingface_cache
       - HUGGING_FACE_HUB_TOKEN=<YOUR_HUGGING_FACE_HUB_TOKEN>
       - MODEL_CKPT=meta-llama/Meta-Llama-3-8B-Instruct
-      - NUM_EPISODES=4
-      - NUM_STM_SLOTS=2
+      - NUM_EPISODES=3
+      - NUM_STM_SLOTS=3
       - MAX_TURN=3
       - MODEL_SERVER_URL=http://llm-server:8000/generate
     volumes:

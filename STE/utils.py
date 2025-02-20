@@ -3,6 +3,12 @@ import json
 from difflib import get_close_matches
 import random
 import os
+import re
+
+# def clean_response(response):
+# # Remove lines that start with “user:”, “assistant:”, or “system:”
+#     return re.sub(r’^(user|assistant|system)\s*’, ‘’, response, flags=re.IGNORECASE | re.MULTILINE)
+# response = clean_response(response)
 
 def find_reverse(str_a, ch):
     assert type(str_a) == type(ch) == str
@@ -33,6 +39,15 @@ def parse_response(response, API_name_list, api_descriptions,
 
     item['parse_successful'] = True
 
+    # NEW: Clean up the chat template special tokens from the response.
+    # This removes tokens introduced by apply_chat_template.
+    for token in ["<|begin_of_text|>", "<|start_header_id|>", "<|end_header_id|>", "<|eot_id|>"]:
+        response = response.replace(token, "")
+    # Also remove common role labels if they appear (in case they are present without the special tokens)
+    for role in ["system", "user", "assistant"]:
+        response = response.replace(role, "")
+    response = response.strip()
+
     if "Final Answer:" in response:
         temp = response.split("Final Answer:")
         response, final_ans = temp[0].strip(), temp[1].strip()
@@ -60,8 +75,6 @@ def parse_response(response, API_name_list, api_descriptions,
     print("DEBUG: Raw ACTION INPUT extracted:", action_input)
     print("DEBUG: Raw ACTION INPUT type:", type(action_input))
     action, action_input = strip_end(action.strip(), "\\n").strip(), strip_end(action_input.strip(), "\\n").strip()
-    print("DEBUG: After strip_end, ACTION INPUT:", action_input)
-    print("DEBUG: After strip_end, ACTION INPUT type:", type(action_input))
 
     # get action
     if "Action:" not in action:
@@ -125,9 +138,8 @@ def parse_response(response, API_name_list, api_descriptions,
 
     # keep only within {}
     action_input = action_input[left_bracket_pos: right_bracket_pos + 1]
-    print("DEBUG: ACTION INPUT after slicing:", action_input)
     action_input = "{" + action_input.strip("{}") + "}"
-    print("DEBUG: ACTION INPUT after re-adding braces:", action_input)
+
     if action_input.startswith("{{"):
         item['parse_successful'] = False
         item['parse_error_msg'] = "the Action Input is in json string format, and should begin with only one \"{\", not two or more."
@@ -141,7 +153,7 @@ def parse_response(response, API_name_list, api_descriptions,
     print("DEBUG: Final ACTION INPUT string:", action_input)
     print("DEBUG: Final ACTION INPUT type before JSON conversion:", type(action_input))
 
-    # **NEW CODE: Convert the JSON string into a Python dictionary**
+    # Convert the JSON string into a Python dictionary
     try:
         action_input_obj = json.loads(action_input)
     except Exception as e:

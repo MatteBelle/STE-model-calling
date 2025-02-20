@@ -22,7 +22,8 @@ RUN update-alternatives --install /usr/bin/python3 python3 /usr/bin/python3.9 1 
 # Upgrade pip and install Python dependencies
 COPY STE/requirements.txt . 
 RUN pip3 install --no-cache-dir --upgrade pip && \
-    pip3 install --no-cache-dir -r requirements.txt 
+    pip3 install --no-cache-dir -r requirements.txt
+RUN pip3 install --no-cache-dir termcolor regex
 
 # Ensure Hugging Face models and cache are stored efficiently
 ENV HF_HOME="/huggingface_cache"
