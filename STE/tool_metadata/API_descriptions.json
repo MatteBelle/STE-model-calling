@@ -11,7 +11,7 @@
           {
               "name": "references",
               "type": "LIST of STRING or LIST of LIST of STRING",
-              "description": "list of reference for each prediction or a list of several references per prediction. Each reference should be a string with tokens separated by spaces.",
+              "description": "list of N references (one for prediction) or a list of N lists of references. Each reference should be a string with tokens separated by spaces.",
               "default": ""
           }
       ],
@@ -57,8 +57,8 @@
           },
           {
               "name": "references",
-              "type": "LIST of STRING",
-              "description": "A list where each element is a list of reference translations for the corresponding prediction.",
+              "type": "LIST of STRING or LIST of LIST of STRING",
+              "description": "list of N reference translations or a list of N lists of reference translations.",
               "default": ""
           }
       ],
