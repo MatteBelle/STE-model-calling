@@ -62,6 +62,8 @@ async def generate_text(request: InferenceRequest):
         )
         # Decode the full generated output
         generated_text = tokenizer.decode(output_tokens[0], skip_special_tokens=True)
+        if generated_text.startswith("assistant\n"):
+            generated_text = generated_text[len("assistant\n"):].strip()
         return {"response": generated_text}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
