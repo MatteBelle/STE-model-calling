@@ -1,4 +1,8 @@
+
 {
+    "_meta": {
+        "note": "All JSON examples must be in valid JSON format. Ensure correct use of double quotes, lists, and closing brackets."
+    },
     "rouge": {
         "description": "ROUGE (Recall-Oriented Understudy for Gisting Evaluation) is a suite of metrics for evaluating automatic summarization and machine translation. It measures the overlap of n-grams, word sequences, and longest common subsequences between a generated text and one or more reference texts in a case-insensitive manner.",
         "required_parameters": [
@@ -25,13 +29,13 @@
             {
                 "name": "use_aggregator",
                 "type": "BOOLEAN",
-                "description": "If True, returns aggregated scores; if False, returns individual scores for each prediction-reference pair. Defaults to True.",
+                "description": "If true, returns aggregated scores; if false, returns individual scores for each prediction-reference pair. Defaults to true.",
                 "default": "true"
             },
             {
                 "name": "use_stemmer",
                 "type": "BOOLEAN",
-                "description": "If True, applies a Porter stemmer to normalize words before comparison. Defaults to False.",
+                "description": "If true, applies a Porter stemmer to normalize words before comparison. Defaults to false.",
                 "default": "false"
             }
         ],
@@ -83,10 +87,12 @@
             ],
             "references": [
                 [
-                    "the cat is sitting on the mat"
+                    "the cat is sitting on the mat",
+                    "the cat is laying on the mat" 
                 ],
                 [
-                    "a fast brown fox jumps over the lazy dog"
+                    "a fast brown fox jumps over the lazy dog",
+                    "a fast brownish fox jumps over the sleepy dog"
                 ]
             ]
         }
@@ -160,7 +166,7 @@
               "name": "add_start_token",
               "type": "BOOLEAN",
               "description": "whether to add the start token to the texts, so the perplexity can include the probability of the first word.",
-              "default": "True"
+              "default": "true"
           }
       ],
         "example": {
@@ -191,8 +197,8 @@
           {
             "name": "normalize",
             "type": "BOOLEAN",
-            "description": "If set to False, returns the number of correctly classified samples. Otherwise, returns the fraction of correctly classified samples",
-            "default": "True"
+            "description": "If set to false, returns the number of correctly classified samples. Otherwise, returns the fraction of correctly classified samples",
+            "default": "true"
           },
           {
             "name": "sample_weight",
@@ -202,18 +208,8 @@
           }
         ],
         "example": {
-            "predictions": [
-                1,
-                0,
-                1,
-                1
-            ],
-            "references": [
-                1,
-                1,
-                1,
-                0
-            ]
+            "predictions": [1, 0, 1, 1],
+            "references": [1, 1, 1, 0]
         }
     },
     "exact_match": {
@@ -222,7 +218,7 @@
             {
                 "name": "predictions",
                 "type": "LIST of STRING",
-                "description": "TList of predicted texts.",
+                "description": "List of predicted texts.",
                 "default": ""
             },
             {
@@ -242,33 +238,25 @@
           {
               "name": "ignore_case",
               "type": "BOOLEAN",
-              "description": "If True, turns everything to lowercase so that capitalization differences are ignored.",
-              "default": "False"
+              "description": "If true, turns everything to lowercase so that capitalization differences are ignored.",
+              "default": "false"
           },
           {
               "name": "ignore_numbers (bool)",
               "type": "BOOLEAN",
-              "description": "If True, removes all digits before comparing strings",
-              "default": "False"
+              "description": "If true, removes all digits before comparing strings",
+              "default": "false"
           },
           {
               "name": "ignore_punctuation (bool)",
               "type": "BOOLEAN",
-              "description": "If True, removes punctuation before comparing strings.",
-              "default": "False"
+              "description": "If true, removes punctuation before comparing strings.",
+              "default": "false"
           }
       ],
         "example": {
-            "predictions": [
-                "Paris",
-                "London",
-                "Berlin"
-            ],
-            "references": [
-                "Paris",
-                "London",
-                "Rome"
-            ]
+            "predictions": ["Paris","London","Berlin"],
+            "references": ["Paris","London","Rome"]
         }
     },
     "recall": {
@@ -311,27 +299,11 @@
                 "type": "LIST of FLOAT",
                 "description": "Sample weights.",
                 "default": "None"
-            },
-            {
-                "name": "sample_weight",
-                "type": "LIST of FLOAT",
-                "description": "Sample weights.",
-                "default": "None"
             }
         ],
         "example": {
-            "predictions": [
-                1,
-                0,
-                1,
-                0
-            ],
-            "references": [
-                1,
-                1,
-                1,
-                0
-            ]
+            "predictions": [1,0,1,0],
+            "references": [1,1,1,0]
         }
     },
     "f1": {
@@ -359,18 +331,8 @@
             }
         ],
         "example": {
-            "predictions": [
-                1,
-                0,
-                1,
-                0
-            ],
-            "references": [
-                1,
-                1,
-                1,
-                0
-            ]
+            "predictions": [1,0,1,0],
+            "references": [1,1,0,0]
         }
     }
   }
