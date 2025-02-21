@@ -363,6 +363,10 @@ def run_evaluation(metric_name, args, API_list, API_descriptions, truncate=False
         print("DEBUG: EVALUATIONEVALUATIONEVALUATIONEVALUATION: NORMALIZED ARGS = " + str(normalized_args))
         metric = evaluate.load(metric_name)
         # Compute the metric using the normalized arguments.
+        # Force model_type for bertscore for GPU limitations.
+        if metric_name == "bertscore":
+            print("DEBUG: Overriding model_type for bertscore to 'google/bert_uncased_L-2_H-128_A-2'")
+            normalized_args["model_type"] = "google/bert_uncased_L-2_H-128_A-2"
         result = metric.compute(**normalized_args)
         print("DEBUG: EVALUATIONEVALUATIONEVALUATIONEVALUATION RESULT = " + str(result))
         result_str = json.dumps(result)
