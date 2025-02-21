@@ -45,10 +45,13 @@ async def generate_text(request: InferenceRequest):
     try:
         # Tokenize the provided prompt (which is already formatted by the client)
         #inputs = tokenizer(request.prompt, return_tensors="pt").to(model.device)
+        print("DENTRO GENERATEEEE------------------------------------------------------------------------------")
+        print("REQUEST PROMPT BEFORE TOKENIZATION: ", request.prompt)
+        print("REQUEST PROMPT AFTER TOKENIZATION: ", tokenizer.apply_chat_template(request.prompt, tokenize=False))
         inputs = tokenizer(tokenizer.apply_chat_template(request.prompt, tokenize=False), return_tensors="pt").to("cuda")
         token_ids = inputs.input_ids[0].tolist()
         print("DEBUG (Server): Prompt length (tokens):", len(token_ids))
-        
+        print("GENERANDO RISPOSTA GENERATEEEE------------------------------------------------------------------------------")
         # Generate output using the provided parameters
         output_tokens = model.generate(
             **inputs,

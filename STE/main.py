@@ -22,7 +22,7 @@ def main(
     final_dir_write: str = "STE/results/final_results/",
     if_visualize: bool = True,
 ):
-    temp=0.5
+    temperature=0.5
     print("DEBUG: Entering main function with parameters:")
     print(f"DEBUG: model_ckpt={model_ckpt}, num_episodes={num_episodes}, num_stm_slots={num_stm_slots}, max_turn={max_turn}, final_dir_write={final_dir_write}, if_visualize={if_visualize}")
     # ---------------------------------------------- Create env for saving results
@@ -96,13 +96,13 @@ def main(
 
             print("DEBUG: Generating the first query using chat_my.")
             response = chat_my(messages, prompt_q_added_question,
-                               temp=temp, stop="Thought:", visualize=if_visualize, max_tokens=512)[-1]['content']
+                               temp=temperature, stop="Thought:", visualize=if_visualize, max_tokens=512)[-1]['content']
 
             messages = messages + [
                 {"role": "user", "content": prompt_q},
                 {"role": "assistant", "content": response}
             ]
-            print("DEBUG FIRST USER QUERY OF SESSION " + str(session_id) +  ": \n" + messages[-2]['content']+"\n\n\n\n")
+            print("DEBUG FIRST USER QUERY OF SESSION " + str(session_id) +  ": \n" + prompt_q_added_question+"\n\n\n\n")
             print("DEBUG FIRST RESPONSE OF SESSION ------------------------------------------------------" + str(session_id) +  ": \n" + response)
             print("DEBUG END: --------------------------------------------------------------------------------------------------------------\n\n\n\n\n\n\n\n")
 
@@ -116,7 +116,7 @@ def main(
 
             chains = []
             print("DEBUG: Processing chain of calls for the first query.")
-            messages = chat_my(messages, prompt_a, temp=temp, stop="Evaluation Result:", visualize=if_visualize, max_tokens=512)            
+            messages = chat_my(messages, prompt_a, temp=temperature, stop="Evaluation Result:", visualize=if_visualize, max_tokens=512)            
             temp = messages[-1]['content']
             
             print("DEBUG FIRST USER ANSWER OF SESSION " + str(session_id) +  ": \n" + messages[-2]['content'] +"\n\n\n\n")
@@ -138,8 +138,8 @@ def main(
                 parsed_response['evaluation_result'] = evaluation_result
                 chains.append(parsed_response)
 
-                messages = chat_my(messages, "Evaluation Result: "+ evaluation_result,
-                                   temp=temp, stop="Evaluation Result:", visualize=if_visualize, max_tokens=512)
+                messages = chat_my(messages, 'Evaluation Result: ' + evaluation_result,
+                                   temp=temperature, stop="Evaluation Result:", visualize=if_visualize, max_tokens=512)
 
                 temp = messages[-1]['content']
                 
@@ -155,9 +155,9 @@ def main(
             first_item['chains'] = chains
 
             print("DEBUG: Running reflection to determine success for the first query.")
-            messages = chat_my(messages, prompt_reflection, temp=temp, stop="Evaluation Result:", visualize=if_visualize, max_tokens=512)
+            messages = chat_my(messages, prompt_reflection, temp=temperature, stop="Evaluation Result:", visualize=if_visualize, max_tokens=512)
             res = messages[-1]['content']
-            print("DEBUG USER QUERY REFLECTION OF SESSION " + str(session_id) + ", TURN " + str(n_turn) + ": \n" + messages[-2]['content'] + "\n\n\n\n")
+            print("DEBUG USER QUERY REFLECTION OF SESSION " + str(session_id) + ", TURN " + str(n_turn) + ": \n" + prompt_reflection + "\n\n\n\n")
             print("DEBUG RESPONSE OF SESSION ------------------------------------------------------" + str(session_id) + ", TURN " + str(n_turn) + ": \n" + res)
             print("DEBUG END: --------------------------------------------------------------------------------------------------------------\n\n\n\n\n\n\n\n")
             
@@ -190,7 +190,7 @@ def main(
 
                 print("DEBUG: Generating follow-up query using chat_my.")
                 response = chat_my(messages, template_q_follow_added_question,
-                                   temp=temp, stop="Thought:", visualize=if_visualize, max_tokens=512)[-1]['content']
+                                   temp=temperature, stop="Thought:", visualize=if_visualize, max_tokens=512)[-1]['content']
                 messages = messages + [
                     {"role": "user", "content": template_q_follow},
                     {"role": "assistant", "content": response}
@@ -205,7 +205,7 @@ def main(
                 chains = []
                 print("DEBUG: Processing chain of calls for the short-term memory slot query.")
                 messages = chat_my(messages, template_a_follow,
-                                   temp=temp, stop="Evaluation Result:", visualize=if_visualize, max_tokens=512)
+                                   temp=temperature, stop="Evaluation Result:", visualize=if_visualize, max_tokens=512)
                 temp = messages[-1]['content']
                 parsed_response = parse_response(temp, API_name_list, API_descriptions)
                 for n_turn in range(max_turn):
@@ -220,8 +220,8 @@ def main(
                     parsed_response['evaluation_result'] = evaluation_result
                     chains.append(parsed_response)
 
-                    messages = chat_my(messages, "Evaluation Result: "+ evaluation_result,
-                                       temp=temp, stop="Evaluation Result:", visualize=if_visualize, max_tokens=512)
+                    messages = chat_my(messages, 'Evaluation Result: '+ evaluation_result,
+                                       temp=temperature, stop="Evaluation Result:", visualize=if_visualize, max_tokens=512)
                     temp = messages[-1]['content']
                     print("DEBUG USER QUERY OF SESSION " + str(session_id) + ", TURN " + str(n_turn) + ", PARSING ACTION AND INPUT: \n" + messages[-2]['content'] + "\n\n\n\n")
                     print("DEBUG RESPONSE OF SESSION ------------------------------------------------------" + str(session_id) + ", TURN " + str(n_turn) + ", PARSING ACTION AND INPUT: \n" + temp)
@@ -235,7 +235,7 @@ def main(
 
                 print("DEBUG: Running reflection to determine success for the short-term memory slot query.")
                 messages = chat_my(messages, prompt_reflection,
-                                   temp=temp, stop="Evaluation Result:", visualize=if_visualize, max_tokens=512)
+                                   temp=temperature, stop="Evaluation Result:", visualize=if_visualize, max_tokens=512)
                 res = messages[-1]['content']
                 print("DEBUG USER QUERY REFLECTION OF SESSION " + str(session_id) + ", TURN " + str(n_turn) + ": \n" + messages[-2]['content'] + "\n\n\n\n")
                 print("DEBUG RESPONSE OF SESSION ------------------------------------------------------" + str(session_id) + ", TURN " + str(n_turn) + ": \n" + res)
@@ -254,8 +254,8 @@ def main(
                 }
             )
             # Save intermediate results right after each session
-            save_intermediate_results(API, session_id, all_sessions, subfolder_path)
-
+            #save_intermediate_results(API, session_id, all_sessions, subfolder_path)
+        save_intermediate_results(API, 99, all_sessions, subfolder_path)
         data_dict[API] = all_sessions
 
     final_data_path = os.path.join(final_dir_write, f"data_dict_{run_timestamp}.json")
@@ -372,7 +372,7 @@ def run_evaluation(metric_name, args, API_list, API_descriptions, truncate=False
         return result_str
     except Exception as e:
             print("DEBUG ERROR IN EVALUATIONEVALUATIONEVALUATIONEVALUATION: " + str(e))
-            return f"Error in run_evaluation: {str(e)}"
+            return f"The Action or Action Input is incorrect: {str(e)}. Fix it and provide new Action or Action input."
 
 def save_intermediate_results(API, session_id, all_sessions, subfolder_path):
     """
@@ -394,5 +394,14 @@ def save_intermediate_results(API, session_id, all_sessions, subfolder_path):
     except Exception as e:
         print(f"DEBUG: Error saving intermediate results: {e}")
 
+def sanitize_evaluation_result(evaluation_result):
+    """
+    Sanitize the evaluation result to ensure it is properly formatted.
+    """
+    # Remove any special characters or malformed data
+    sanitized_result = evaluation_result.replace("\n", " ").replace("\r", " ").strip()
+    return sanitized_result
+
 if __name__ == '__main__':
     fire.Fire(main)
+    

@@ -4,6 +4,7 @@ from termcolor import colored
 from copy import deepcopy
 import os
 import requests  # For HTTP calls to the llm_server
+import json
 
 # Set up the Hugging Face cache directory
 HF_HOME = "/huggingface_cache"
@@ -22,7 +23,8 @@ def get_chat_completion_my(messages, max_tokens=512, temp=0.4, return_raw=False,
     # assistant_header = "<|start_header_id|> assistant <|end_header_id|>\n\n"
     # full_prompt = prompt + assistant_header
     # print("DEBUG: Formatted prompt with assistant header:", full_prompt)
-    
+    # print("MESSAGES: ", str(messages))
+    # print("MESSAGES TYPE: ", type(messages))
     server_url = os.environ.get("MODEL_SERVER_URL", "http://localhost:8000/generate")
     payload = {
         #"prompt": full_prompt,
@@ -30,15 +32,22 @@ def get_chat_completion_my(messages, max_tokens=512, temp=0.4, return_raw=False,
         "max_tokens": max_tokens,
         "temperature": temp
     }
-    
+
     try:
+        # print("MESSAGES TYPESSS: ", type(messages))
+        # print("MESSAGES max_tokens TYPESSS: ", type(max_tokens))
+        # print("MESSAGES temperature TYPESSS: ", type(temp))
+        # for d in messages:
+        #     print(type(d))
+        #     print(type(d['role']))
+        #     print(type(d['content']))
         response = requests.post(server_url, json=payload)
         response_json = response.json()
         response_text = response_json.get("response", "")
     except Exception as e:
         print("ERROR: Failed to get response from LLM server:", e)
         response_text = ""
-    
+    #print("RESPONSE TEXT: ", response_text)
     #print(f"DEBUG-MY_LLM: Full response before processing:\n{response_text}")
     
     # Remove the prompt part from the generated text.
@@ -54,6 +63,7 @@ def get_chat_completion_my(messages, max_tokens=512, temp=0.4, return_raw=False,
     
     # Remove the prompt from the answer (cut from the head)
     parts = response_text.split("<|promptends|>")
+    #print("PARTS: ", str(parts))
     if parts:
         response_text = parts[1].strip()
     else:
@@ -105,8 +115,11 @@ def visualize_messages(messages):
             #print("GENERATED RESPONSE ENDS: ----------------------")
 
 def chat_my(messages, new_message, visualize=True, **params):
+    # print("NEW MESSAGE: ", new_message)
+    # print("NEW MESSAGE TYPE: ", type(new_message))
     messages = deepcopy(messages)
-    messages.append({"role": "user", "content": new_message + "<|promptends|>"})
+    messages.append({"role": "user", "content": json.dumps(str(new_message) + "<|promptends|>")})
+    #print("MESSAGE: ", str(messages[-1]['content']))
     # Call get_chat_completion_my without passing model
     response = get_chat_completion_my(messages, **params)
     messages[-1]["content"] = messages[-1]["content"].replace("<|promptends|>", "").strip()
