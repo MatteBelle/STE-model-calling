@@ -10,19 +10,19 @@ HF_HOME = "/huggingface_cache"
 os.environ["HF_HOME"] = HF_HOME
 os.makedirs(HF_HOME, exist_ok=True)
 
-MODEL_NAME = "meta-llama/Meta-Llama-3-8B-Instruct"
+#MODEL_NAME = "meta-llama/Meta-Llama-3-8B-Instruct"
+MODEL_NAME = "meta-llama/Llama-3.1-8B-Instruct"
 print("DEBUGs (Server): Initializing tokenizer from MODEL_NAME.")
 tokenizer = AutoTokenizer.from_pretrained(MODEL_NAME, cache_dir=HF_HOME, max_length=4096)
+print(f"DEBUG (Server): Model and tokenizer loaded successfully. Cached at {HF_HOME}")
+
+tokenizer.add_special_tokens({"pad_token": "<PAD>"})
 # test = [
 #   {"role": "system", "content": "You are a helpful assistant"},
 #   {"role": "assistant", "content": "I'm doing great. How can I help you today?"},
 #   {"role": "user", "content": "I'd like to show off how chat templating works!"},
 # ]
 # print("CHAT_TEMPLATE APPLIED TO TEST: " + str(tokenizer.apply_chat_template(test, tokenize=False)))
-#model.resize_token_embeddings(len(tokenizer))
-print(f"DEBUG (Server): Model and tokenizer loaded successfully. Cached at {HF_HOME}")
-
-tokenizer.add_special_tokens({"pad_token": "<PAD>"})
 print("DEBUG (Server): Initializing model from MODEL_NAME.")
 model = AutoModelForCausalLM.from_pretrained(
     MODEL_NAME,
@@ -62,8 +62,7 @@ async def generate_text(request: InferenceRequest):
         )
         # Decode the full generated output
         generated_text = tokenizer.decode(output_tokens[0], skip_special_tokens=True)
-        if generated_text.startswith("assistant\n"):
-            generated_text = generated_text[len("assistant\n"):].strip()
+        print("GENERATED TEXT= ", str(generated_text))
         return {"response": generated_text}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))

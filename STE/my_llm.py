@@ -123,6 +123,9 @@ def chat_my(messages, new_message, visualize=True, **params):
     # Call get_chat_completion_my without passing model
     response = get_chat_completion_my(messages, **params)
     messages[-1]["content"] = messages[-1]["content"].replace("<|promptends|>", "").strip()
+    # clean the output of extra remaining of the chat template (llama-3-8b)
+    response = response.replace('"assistant\n\n', "")
+    response = response.replace('assistant\n', "")
     messages.append({"role": "assistant", "content": response})
     #print("DEBUG CHAT MY, RESPONSE: " + response)
     if visualize:

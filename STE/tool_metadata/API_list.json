@@ -1,8 +1,8 @@
 [  
   "accuracy",
+  "bertscore",
   "exact_match",
   "recall",
-  "bertscore",
   "perplexity",
   "f1",
   "bleu",

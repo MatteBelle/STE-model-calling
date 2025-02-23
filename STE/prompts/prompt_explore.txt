@@ -5,10 +5,11 @@ Your task is to **output a single, well-structured query** that a user might nat
 
 **Task Instructions:**  
 Generate **one** realistic user query.  
+Rephrase the query request with different formulation to simulate different users approaches.
 The query should be **concise, natural, and human-like**.  
-The query should **only** request metric evaluation **for a set references and predictions**.     
+The query should **only** request metric evaluation **for a set references and predictions**.    
 The query should provide creative references and predictions.  
-**References and prediction lists must both have N entries** 
+**References and prediction lists must both have N entries**   
 Do **not** add explanations, descriptions, or metadata.  
 Do **not** repeat yourself.
 **Stop after outputting the query.**
@@ -47,7 +48,7 @@ User Query (the same you just synthesized): {query}
 
 =========
 
-Now you know a bit more about the available evaluation metrics. You can synthesize another user query to explore the metrics further and consolidate your understanding based on what you discovered. Again, just input the user query alone; do NOT solve the query for now.
+Now you know a bit more about the available evaluation metrics. You can synthesize another creative user query (it should differ from the previous ones) to explore the metrics further and consolidate your understanding based on what you discovered. Again, just input the user query alone; do NOT solve the query for now.
 
 User Query:
 
