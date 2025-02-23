@@ -64,7 +64,7 @@ def main(
 
         template_q, template_a, template_q_follow, template_a_follow = prompt_template.split("=========")
         template_q, template_a, template_q_follow, template_a_follow = template_q.strip(), template_a.strip(), template_q_follow.strip(), template_a_follow.strip() #TOCHECK 15/02
-
+        template_q_follow = template_q_follow.format(placeholder=placeholder)
         all_sessions, explored_queries, whether_successful = [], [], []
         # LOOP on the SAME API with the SAME MEMORY --> num_episodes
         for session_id in range(num_episodes):
@@ -193,7 +193,7 @@ def main(
                 response = chat_my(messages, template_q_follow_added_question,
                                    temp=temperature, stop="Thought:", visualize=if_visualize, max_tokens=512)[-1]['content']
                 messages = messages + [
-                    {"role": "user", "content": template_q_follow},
+                    {"role": "user", "content": template_q_follow_added_question},
                     {"role": "assistant", "content": response}
                 ]
                 print("DEBUG USER QUERY REFLECTION OF SESSION " + str(session_id) + ", STM TURN " + str(n_stm) + ": \n" + template_q_follow_added_question + "\n\n\n\n")

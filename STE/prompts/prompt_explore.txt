@@ -48,7 +48,7 @@ User Query (the same you just synthesized): {query}
 
 =========
 
-Now you know a bit more about the available evaluation metrics. You can synthesize another creative user query (it should differ from the previous ones) to explore the metrics further and consolidate your understanding based on what you discovered. Again, just input the user query alone; do NOT solve the query for now.
+Now you know a bit more about the available evaluation metrics. You can synthesize another creative user query (it should differ from the previous ones) to explore the metrics further and consolidate your understanding based on what you discovered. Remember that {placeholder} is a placeholder I use for trimmed texts, so *don't* use {placeholder} it in your queries. Again, just input the user query alone; do NOT solve the query for now.
 
 User Query:
 
