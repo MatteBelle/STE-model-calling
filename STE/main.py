@@ -5,7 +5,7 @@ import numpy as np
 import time
 import fire
 from transformers import pipeline  # Import Hugging Face pipeline
-from utils import find_reverse, random_choose, parse_response, strip_end, delete_intermediate_subfolder#, get_random_metric_subgroup_with_flags
+from utils import find_reverse, random_choose, parse_response, strip_end, delete_intermediate_subfolder, trim_ltm_stm#, get_random_metric_subgroup_with_flags
 from my_llm import chat_my, visualize_messages, get_chat_completion_my#, set_tokenizer
 from transformers import AutoTokenizer, AutoModelForCausalLM
 import torch
@@ -15,14 +15,15 @@ import random
 
 def main(
     model_ckpt: str = 'meta-llama/Meta-Llama-3-8B-Instruct',
-    num_episodes: int = 15,
+    num_episodes: int = 5,
     num_stm_slots: int = 3,
     max_turn: int = 4,
     intermediate_dir_write: str = "STE/results/intermediate_results/",
     final_dir_write: str = "STE/results/final_results/",
     if_visualize: bool = True,
 ):
-    temperature=0.5
+    temperature=0.6
+    placeholder = "[...]" # used for trimmed LTM lists
     print("DEBUG: Entering main function with parameters:")
     print(f"DEBUG: model_ckpt={model_ckpt}, num_episodes={num_episodes}, num_stm_slots={num_stm_slots}, max_turn={max_turn}, final_dir_write={final_dir_write}, if_visualize={if_visualize}")
     # ---------------------------------------------- Create env for saving results
@@ -46,10 +47,11 @@ def main(
         API_descriptions = json.load(f)
     with open("STE/tool_metadata/API_list.json", "r", encoding='utf-8') as f:
         API_list = json.load(f)
-
+    data_dict["ALL_METRICS"] = API_list
+    data_dict["ALL_METRICS_DESCRIPTIONS"] = API_descriptions
     # Memory and reflection prompts (unchanged)
     PAST_Q_MSG_pre = "Below are queries you have already explored and whether you successfully solved them with the API's help:"
-    PAST_Q_MSG_post = "Based on these, try to explore queries that can help you understand the API further; avoid synthesizing queries that are too close to the existing ones."
+    PAST_Q_MSG_post = f"Based on these, try to explore queries that can help you understand the API further; avoid synthesizing queries that are too close to the existing ones and remember that {placeholder} is a placeholder I use for trimmed texts, so don't use {placeholder} it in your queries. Try different ways to formulate the query (use synonyms, vary its structure, vary the length of the question, etc.)."
     prompt_reflection = "Do you think you successfully fulfilled this query in the end? Respond with \"Yes\" or \"No\"."
 
     print("DEBUG: Starting iteration over API_list.")
@@ -85,7 +87,7 @@ def main(
                 prompt_q_added_question = strip_end(prompt_q, "User Query:").strip() #TOCHECK 15/02
                 #prompt_q_added_question = strip_end(prompt_q, "User Query:")                
                 prompt_q_added_question = prompt_q_added_question + "\n\n" + \
-                    PAST_Q_MSG_pre + "\n" + "\n".join(LTM(explored_queries, whether_successful)) + \
+                    PAST_Q_MSG_pre + "\n" + "\n".join(trim_ltm_stm(LTM(explored_queries, whether_successful), placeholder=placeholder)) + \
                     "\n\n" + PAST_Q_MSG_post + "\n\nUser Query:"
             else:
                 prompt_q_added_question = prompt_q
@@ -183,7 +185,7 @@ def main(
                     template_q_follow_added_question = strip_end(template_q_follow, "User Query:").strip() # TOCHECK 15/02
                     #template_q_follow_added_question = strip_end(template_q_follow, "User Query:")
                     template_q_follow_added_question = template_q_follow_added_question + "\n\n" + \
-                    PAST_Q_MSG_pre + "\n" + "\n".join(LTM(explored_queries, whether_successful)) + \
+                    PAST_Q_MSG_pre + "\n" + "\n".join(trim_ltm_stm(LTM(explored_queries, whether_successful), placeholder=placeholder)) + \
                     "\n\n" + PAST_Q_MSG_post + "\n\nUser Query:"
                 else:
                     template_q_follow_added_question = template_q_follow
@@ -195,7 +197,7 @@ def main(
                     {"role": "user", "content": template_q_follow},
                     {"role": "assistant", "content": response}
                 ]
-                print("DEBUG USER QUERY REFLECTION OF SESSION " + str(session_id) + ", STM TURN " + str(n_stm) + ": \n" + messages[-2]['content'] + "\n\n\n\n")
+                print("DEBUG USER QUERY REFLECTION OF SESSION " + str(session_id) + ", STM TURN " + str(n_stm) + ": \n" + template_q_follow_added_question + "\n\n\n\n")
                 print("DEBUG RESPONSE OF SESSION ------------------------------------------------------" + str(session_id) + ", STM TURN " + str(n_stm) + ": \n" + response)
                 print("DEBUG END: --------------------------------------------------------------------------------------------------------------\n\n\n\n\n\n\n\n")
                 query = messages[-1]['content']
@@ -257,8 +259,8 @@ def main(
             #save_intermediate_results(API, session_id, all_sessions, subfolder_path)
         save_intermediate_results(API, 99, all_sessions, subfolder_path)
         data_dict[API] = all_sessions
-
     final_data_path = os.path.join(final_dir_write, f"data_dict_{run_timestamp}.json")
+    data_dict = sanitize_for_json(data_dict)
     with open(final_data_path, "w", encoding='utf-8') as f:
         json.dump(data_dict, f)
     delete_intermediate_subfolder(subfolder_path)
@@ -267,7 +269,6 @@ def main(
 
 
 def LTM(X, labels):
-    print("DEBUG: Calling LTM function.")
     #assert len(X) == len(labels)
     try:
         assert len(X) == len(labels)
@@ -364,9 +365,13 @@ def run_evaluation(metric_name, args, API_list, API_descriptions, truncate=False
         metric = evaluate.load(metric_name)
         # Compute the metric using the normalized arguments.
         # Force model_type for bertscore for GPU limitations.
+        #I still want the model to try different prompts but don't want memory to get filled up
         if metric_name == "bertscore":
             print("DEBUG: Overriding model_type for bertscore to 'google/bert_uncased_L-2_H-128_A-2'")
             normalized_args["model_type"] = "google/bert_uncased_L-2_H-128_A-2"
+        if metric_name == "perplexity":
+            print("DEBUG: Overriding model_id for perplexity to 'gpt-2'") 
+            normalized_args["model_id"] = "gpt2"
         result = metric.compute(**normalized_args)
         print("DEBUG: EVALUATIONEVALUATIONEVALUATIONEVALUATION RESULT = " + str(result))
         result_str = json.dumps(result)
@@ -398,13 +403,18 @@ def save_intermediate_results(API, session_id, all_sessions, subfolder_path):
     except Exception as e:
         print(f"DEBUG: Error saving intermediate results: {e}")
 
-def sanitize_evaluation_result(evaluation_result):
-    """
-    Sanitize the evaluation result to ensure it is properly formatted.
-    """
-    # Remove any special characters or malformed data
-    sanitized_result = evaluation_result.replace("\n", " ").replace("\r", " ").strip()
-    return sanitized_result
+def sanitize_for_json(obj):
+    if isinstance(obj, (np.integer, np.int64)):
+        return int(obj)
+    if isinstance(obj, (np.floating, np.float32, np.float64)):
+        return float(obj)
+    if isinstance(obj, (np.bool_)):
+        return bool(obj)
+    if isinstance(obj, dict):
+        return {str(key): sanitize_for_json(value) for key, value in obj.items()}
+    if isinstance(obj, list):
+        return [sanitize_for_json(item) for item in obj]
+    return obj
 
 if __name__ == '__main__':
     fire.Fire(main)
