@@ -14,7 +14,6 @@ import evaluate
 import random
 
 def main(
-    model_ckpt: str = 'meta-llama/Meta-Llama-3-8B-Instruct',
     num_episodes: int = 5,
     num_stm_slots: int = 3,
     max_turn: int = 4,
@@ -25,7 +24,7 @@ def main(
     temperature=0.6
     placeholder = "[...]" # used for trimmed LTM lists
     print("DEBUG: Entering main function with parameters:")
-    print(f"DEBUG: model_ckpt={model_ckpt}, num_episodes={num_episodes}, num_stm_slots={num_stm_slots}, max_turn={max_turn}, final_dir_write={final_dir_write}, if_visualize={if_visualize}")
+    print(f"num_episodes={num_episodes}, num_stm_slots={num_stm_slots}, max_turn={max_turn}, final_dir_write={final_dir_write}, if_visualize={if_visualize}")
     # ---------------------------------------------- Create env for saving results
     print("DEBUG: Ensuring output directories exists.")
     os.makedirs(final_dir_write, exist_ok=True)
