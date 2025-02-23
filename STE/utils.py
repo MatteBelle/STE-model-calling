@@ -34,8 +34,9 @@ def strip_end(a, b):
 def parse_response(response, API_name_list, api_descriptions,
                    proc_thought=False, proc_toolken=False, check_API_name=True, ground_API=False):
     item = dict()
-    item['API_name_list'] = API_name_list
-    item['api_descriptions'] = api_descriptions
+    # Commented these as I don't want all api names and descriptions to be repeated, I added them just once in the beginning
+    # item['API_name_list'] = API_name_list
+    # item['api_descriptions'] = api_descriptions
 
     item['parse_successful'] = True
 
@@ -60,10 +61,10 @@ def parse_response(response, API_name_list, api_descriptions,
     if "Action Input:" not in response:
         item['parse_successful'] = False
         item['parse_error_msg'] = ("If you have already got enough information for the final answer, say "
-                                   "\"Final Answer:\" followed by your answer. Otherwise, please specify your API call via "
+                                   "\"Final Answer:\" followed by your answer and your consideration on the result and whether other metrics for evaluation could be useful.. Otherwise, please specify your API call via "
                                    "\"Action:\" and API arguments via \"Action Input:\" followed by a json string. "
                                    "If there are no arguments, use \"Action Input: {}\". Do NOT start your response with "
-                                   "\"Observation:\"; there is no need to repeat it.")
+                                   "\"Evaluation Result:\"; there is no need to repeat it.")
         return item
 
     if response.count("Action Input:") > 1:
@@ -72,8 +73,6 @@ def parse_response(response, API_name_list, api_descriptions,
         return item
 
     action, action_input = response.split("Action Input:")
-    print("DEBUG: Raw ACTION INPUT extracted:", action_input)
-    print("DEBUG: Raw ACTION INPUT type:", type(action_input))
     action, action_input = strip_end(action.strip(), "\\n").strip(), strip_end(action_input.strip(), "\\n").strip()
 
     # get action
@@ -150,11 +149,10 @@ def parse_response(response, API_name_list, api_descriptions,
         return item
 
     action_input = action_input.strip()
-    print("DEBUG: Final ACTION INPUT string:", action_input)
-    print("DEBUG: Final ACTION INPUT type before JSON conversion:", type(action_input))
 
     # Convert the JSON string into a Python dictionary
     try:
+        print("DEBUG: BEFORE JSONLOADS: ", action_input)
         action_input_obj = json.loads(action_input)
     except Exception as e:
         item['parse_successful'] = False
@@ -224,6 +222,55 @@ def delete_intermediate_subfolder(subfolder_path):
             print(f"DEBUG: Subfolder does not exist: {subfolder_path}")
     except Exception as e:
         print(f"DEBUG: Error deleting intermediate subfolder: {e}")
+
+def trim_ltm_stm(ltm_list, placeholder="[...]", max_length=2000, list_trim_threshold=40):
+    """
+    Trims long text lists in the LTM entries and replaces them with a placeholder, 
+    while preserving some examples for context. List of lists are trimmed only if too long.
+
+    Args:
+        ltm_list (list): List of strings containing the LTM queries.
+        placeholder (str): Placeholder text to replace long lists.
+        max_length (int): Max length of entire entry before truncation.
+        list_trim_threshold (int): Maximum number of characters a list can have before being trimmed.
+
+    Returns:
+        list: Trimmed LTM list.
+    """
+    trimmed_ltm = []
+
+    for entry in ltm_list:
+        # Function to selectively trim long lists but keep part of the data
+        def trim_list(match):
+            content = match.group(0)  # The entire matched list
+            if len(content) > list_trim_threshold:
+                # Preserve the first few elements of the list while trimming the rest
+                partial_content = re.sub(r"(\[.*?, .*?)\s*,\s*.*?\]", rf"\1, {placeholder} ]", content, flags=re.DOTALL)
+                return partial_content.replace(f"[{placeholder},", f"[{placeholder}")  # Cleanup format
+            return content  # If the list is short, return as is
+
+        # Function to handle nested lists (list of lists)
+        def trim_nested_list(match):
+            content = match.group(0)  # The entire matched nested list
+            if len(content) > list_trim_threshold:
+                # Preserve some nested elements while trimming the rest
+                partial_content = re.sub(r"(\[\[.*?\], \[.*?\])\s*,\s*.*?\]", rf"\1, {placeholder} ]", content, flags=re.DOTALL)
+                return partial_content.replace(f"[{placeholder},", f"[{placeholder}")  # Cleanup format
+            return content  # If the nested list is short, return as is
+
+        # Trim only long nested lists (list of lists)
+        trimmed_entry = re.sub(r"\[\s*(?:\[[^\]]*\]\s*,?\s*)+\]", trim_nested_list, entry, flags=re.DOTALL)  
+
+        # Trim only long lists inside brackets
+        trimmed_entry = re.sub(r"\[.*?\]", trim_list, trimmed_entry, flags=re.DOTALL)  
+
+        # If the whole entry is still too long, truncate the text itself
+        if len(trimmed_entry) > max_length:
+            trimmed_entry = trimmed_entry[:max_length] + " " + placeholder
+
+        trimmed_ltm.append(trimmed_entry)
+
+    return trimmed_ltm
     
 if __name__ == '__main__':
     print()
