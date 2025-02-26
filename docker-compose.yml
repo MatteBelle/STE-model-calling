@@ -37,9 +37,9 @@ services:
     environment:
       - HF_HOME=/huggingface_cache
       - HUGGING_FACE_HUB_TOKEN=<YOUR_HUGGING_FACE_HUB_TOKEN>
-      - NUM_EPISODES=2
-      - NUM_STM_SLOTS=1
-      - MAX_TURN=3
+      - NUM_EPISODES=10
+      - NUM_STM_SLOTS=4
+      - MAX_TURN=4
       - MODEL_SERVER_URL=http://llm-server:8000/generate
     volumes:
       - /home/belletti/STE-model-calling/STE:/home/belletti/STE-model-calling/STE

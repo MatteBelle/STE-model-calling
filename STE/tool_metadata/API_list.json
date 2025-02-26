@@ -1,6 +1,6 @@
 [  
-  "accuracy",
   "bertscore",
+  "accuracy",
   "exact_match",
   "recall",
   "perplexity",

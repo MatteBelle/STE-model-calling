@@ -34,173 +34,221 @@ def strip_end(a, b):
 def parse_response(response, API_name_list, api_descriptions,
                    proc_thought=False, proc_toolken=False, check_API_name=True, ground_API=False):
     item = dict()
-    # Commented these as I don't want all api names and descriptions to be repeated, I added them just once in the beginning
+    # (Optionally include API metadata only once if needed)
     # item['API_name_list'] = API_name_list
     # item['api_descriptions'] = api_descriptions
 
     item['parse_successful'] = True
+    item['actions'] = []
 
-    # NEW: Clean up the chat template special tokens from the response.
-    # This removes tokens introduced by apply_chat_template.
+    # Clean up special tokens and common role labels.
     for token in ["<|begin_of_text|>", "<|start_header_id|>", "<|end_header_id|>", "<|eot_id|>"]:
         response = response.replace(token, "")
-    # Also remove common role labels if they appear (in case they are present without the special tokens)
     for role in ["system", "user", "assistant"]:
         response = response.replace(role, "")
     response = response.strip()
 
+    # Check for final answer; if found and no actions precede, mark finish.
     if "Final Answer:" in response:
-        temp = response.split("Final Answer:")
-        response, final_ans = temp[0].strip(), temp[1].strip()
-        if "Action Input:" not in response:
+        parts = response.split("Final Answer:")
+        pre_final = parts[0].strip()
+        final_ans = parts[-1].strip()
+        # If no Action Input is found before Final Answer, then we assume the process is complete.
+        if "Action Input:" not in pre_final:
             item['final_ans'] = final_ans
             item['finish'] = True
             return item
+        # Otherwise, we record the final answer and continue to extract actions.
+        item['final_ans'] = final_ans
+        item['finish'] = True
+    else:
+        item['finish'] = False
 
-    item['finish'] = False
-    if "Action Input:" not in response:
+    # Remove the Final Answer part from further processing.
+    if "Final Answer:" in response:
+        response = response.split("Final Answer:")[0]
+
+    # Now extract all occurrences of Action and corresponding Action Input.
+    # We split by "Action:" and ignore the part before the first occurrence.
+    raw_actions = response.split("Action:")[1:]
+    if not raw_actions:
         item['parse_successful'] = False
-        item['parse_error_msg'] = ("If you have already got enough information for the final answer, say "
-                                   "\"Final Answer:\" followed by your answer and your consideration on the result and whether other metrics for evaluation could be useful.. Otherwise, please specify your API call via "
-                                   "\"Action:\" and API arguments via \"Action Input:\" followed by a json string. "
-                                   "If there are no arguments, use \"Action Input: {}\". Do NOT start your response with "
-                                   "\"Evaluation Result:\"; there is no need to repeat it.")
+        item['parse_error_msg'] = ("No 'Action:' found in your response. Please specify at least one Action and its Action Input "
+                                   "using the format:\nAction: <metric name>\nAction Input: <JSON string>")
         return item
 
-    if response.count("Action Input:") > 1:
+    actions_list = []
+    for raw in raw_actions:
+        # Each raw block should contain an "Action Input:" token.
+        if "Action Input:" not in raw:
+            continue  # Skip any malformed block.
+        action_text, remainder = raw.split("Action Input:", 1)
+        action = action_text.strip()
+        if proc_toolken:
+            action = action.replace("<tool_", "").strip("<>")
+        if check_API_name and (action not in API_name_list):
+            if ground_API:
+                from difflib import get_close_matches
+                action = get_close_matches(action, API_name_list, n=1, cutoff=0.001)[0]
+            else:
+                item['parse_successful'] = False
+                item['parse_error_msg'] = ("Please only use exactly one of the following APIs: {}."
+                                           .format(", ".join(API_name_list)))
+                return item
+
+        # Extract the JSON block from the remainder.
+        # If an "Evaluation Result:" token exists, we take the text before it.
+        if "Evaluation Result:" in remainder:
+            candidate = remainder.split("Evaluation Result:")[0].strip()
+        else:
+            candidate = remainder.strip()
+        left_index = candidate.find("{")
+        right_index = candidate.rfind("}")
+        if left_index == -1 or right_index == -1 or right_index <= left_index:
+            item['parse_successful'] = False
+            item['parse_error_msg'] = ("The Action Input is not in valid JSON format. It should begin with '{' and end with '}'.")
+            return item
+        json_str = candidate[left_index:right_index+1]
+        # Check for extra braces.
+        if json_str.startswith("{{") or json_str.endswith("}}"):
+            item['parse_successful'] = False
+            item['parse_error_msg'] = ("The Action Input should begin with a single '{' and end with a single '}'.")
+            return item
+        try:
+            action_input_obj = json.loads(json_str)
+        except Exception as e:
+            item['parse_successful'] = False
+            item['parse_error_msg'] = "Error parsing JSON in Action Input: " + str(e)
+            return item
+
+        actions_list.append({"action": action, "action_input": action_input_obj})
+    if not actions_list:
         item['parse_successful'] = False
-        item['parse_error_msg'] = "Please use only one \"Action Input:\" in your response."
+        item['parse_error_msg'] = ("No valid Action and Action Input pairs were found. Please ensure you follow the format correctly.")
         return item
 
-    action, action_input = response.split("Action Input:")
-    action, action_input = strip_end(action.strip(), "\\n").strip(), strip_end(action_input.strip(), "\\n").strip()
-
-    # get action
-    if "Action:" not in action:
-        item['parse_successful'] = False
-        item['parse_error_msg'] = ("Please specify the API name you would like to call via \"Action:\" followed by the name. "
-                                   "Remember that you should only call one API at a time, and the API name should be one of the following: {}. "
-                                   "If you have already got the final answer, say \"Final Answer:\" followed by your final answer.").format(
-                                    ", ".join(API_name_list))
-        return item
-
-    if action.count("Action:") > 1:
-        item['parse_successful'] = False
-        item['parse_error_msg'] = "Please use only one \"Action:\" in your response."
-        return item
-
-    thought, action = action.split("Action:")
-    thought, action = strip_end(thought.strip(), "\\n").strip(), strip_end(action.strip(), "\\n").strip()
-
-    if proc_toolken:
-        action = action.replace("<tool_", "").strip("<>")
-
-    if check_API_name and (action not in API_name_list):
-        if ground_API:
-            # find the closest API that is supported
-            action = get_close_matches(action, API_name_list, n=1, cutoff=0.001)[0]
+    item['actions'] = actions_list
+    # Optionally, process Thought if proc_thought is True.
+    if proc_thought:
+        if "Thought:" in response:
+            # Get the last occurrence.
+            thought = response.split("Thought:")[-1].strip()
+            item['thought'] = thought
         else:
             item['parse_successful'] = False
-            item['parse_error_msg'] = "Please only use exactly one of the following APIs: {}.".format(
-                ", ".join(API_name_list))
+            item['parse_error_msg'] = "Your response should include a 'Thought:' section."
             return item
 
-    if proc_thought:
-        if "Thought:" not in thought:
-            item['parse_successful'] = False
-            item['parse_error_msg'] = "Your thought should begin with \"Thought:\"."
-            return item
-
-        if thought.count("Thought:") > 1:
-            item['parse_successful'] = False
-            item['parse_error_msg'] = "Please use only one \"Thought:\" in your response."
-            return item
-
-        thought = thought.split("Thought:")[-1].strip()
-
-    # get action input
-    left_bracket_pos = action_input.find('{')
-    if left_bracket_pos == -1:
-        item['parse_successful'] = False
-        item['parse_error_msg'] = "the Action Input is in json string format, and should begin with \"{\""
-        return item
-    right_bracket_pos = find_reverse(action_input, '}')
-    if right_bracket_pos == -1:
-        item['parse_successful'] = False
-        item['parse_error_msg'] = "the Action Input is in json string format, and should end with \"}\". Do NOT say anything else after \"}\""
-        return item
-
-    if left_bracket_pos >= right_bracket_pos:
-        item['parse_successful'] = False
-        item['parse_error_msg'] = "Your action input cannot be parsed as a json string. Please try again."
-        return item
-
-    # keep only within {}
-    action_input = action_input[left_bracket_pos: right_bracket_pos + 1]
-    action_input = "{" + action_input.strip("{}") + "}"
-
-    if action_input.startswith("{{"):
-        item['parse_successful'] = False
-        item['parse_error_msg'] = "the Action Input is in json string format, and should begin with only one \"{\", not two or more."
-        return item
-    if action_input.endswith("}}"):
-        item['parse_successful'] = False
-        item['parse_error_msg'] = "the Action Input is in json string format, and should end with only one \"}\". Do NOT say anything else after \"}\""
-        return item
-
-    action_input = action_input.strip()
-
-    # Convert the JSON string into a Python dictionary
-    try:
-        print("DEBUG: BEFORE JSONLOADS: ", action_input)
-        action_input_obj = json.loads(action_input)
-    except Exception as e:
-        item['parse_successful'] = False
-        item['parse_error_msg'] = "Error parsing JSON in Action Input: " + str(e)
-        return item
-
-    print("DEBUG: ACTION INPUT object after JSON conversion:", action_input_obj)
-    print("DEBUG: ACTION INPUT type after JSON conversion:", type(action_input_obj))
-
-    item['parse_successful'] = True
-    if proc_thought:
-        item['thought'] = thought
-    item['action'] = action
-    item['action_input'] = action_input_obj
     return item
 
-def get_random_metric_subgroup_with_flags(json_path="tool_metadata/API_subgroups.json"):
+def get_metric_subgroup(metric_name: str = None, json_path: str = "STE/tool_metadata/API_subgroups.json"):
     """
-    Loads the metric subgroups from a JSON file, randomly selects one subgroup,
-    and for each metric in that subgroup, generates a boolean flag that is True
-    with 30% probability (and False with 70% probability).
-
-    Parameters:
-        json_path (str): Path to the JSON file containing the metric subgroups.
-
+    Loads the subgroups from the given JSON file and returns a single subgroup 
+    with 'name' and 'metrics'. If 'metric_name' is provided, only subgroups 
+    containing that metric will be considered.
+    
     Returns:
-        dict: A dictionary with the following keys:
-            - "name": The name of the selected subgroup.
-            - "metrics": A list of metric names in the subgroup.
-            - "optional_flags": A dictionary mapping each metric name to a boolean flag.
+        dict: {
+            "name": <subgroup_name>,
+            "metrics": <list_of_metrics_in_that_subgroup>
+        }
     """
     if not os.path.exists(json_path):
         raise FileNotFoundError(f"Subgroups JSON file not found at: {json_path}")
-    
+
     with open(json_path, "r", encoding="utf-8") as f:
         subgroups = json.load(f)
-    
-    # Randomly choose one subgroup from the dictionary values.
-    chosen_subgroup = random.choice(list(subgroups.values()))
-    
-    # For each metric in the subgroup, assign a boolean flag (True with probability 0.3).
-    optional_flags = {metric: (random.random() < 0.3) for metric in chosen_subgroup["metrics"]}
-    
+
+    # Convert dict of subgroups to a list
+    subgroup_list = list(subgroups.values())
+
+    if metric_name:
+        # Filter subgroups to only those containing the given metric
+        filtered_subgroups = [
+            subgroup for subgroup in subgroup_list
+            if metric_name in subgroup["metrics"]
+        ]
+        if not filtered_subgroups:
+            raise ValueError(
+                f"No subgroups found containing the metric '{metric_name}'. "
+                f"Available subgroups: {[sg['name'] for sg in subgroup_list]}"
+            )
+        chosen_subgroup = random.choice(filtered_subgroups)
+    else:
+        chosen_subgroup = random.choice(subgroup_list)
+
     return {
         "name": chosen_subgroup["name"],
-        "metrics": chosen_subgroup["metrics"],
+        "metrics": chosen_subgroup["metrics"]
+    }
+    
+def get_parameters_optionality(metrics):
+    """
+    For each metric in 'metrics', assign a boolean flag 
+    that is True with 30% probability (False otherwise).
+
+    Returns:
+        dict: { metric_name: bool }
+    """
+    optional_flags = {}
+    for metric in metrics:
+        optional_flags[metric] = (random.random() < 0.3)
+    return optional_flags
+
+def get_random_metric_subgroup_with_flags(
+    metric_name: str = None, 
+    json_path: str = "STE/tool_metadata/API_subgroups.json"
+):
+    """
+    Wrapper that:
+      1) Retrieves a subgroup via get_metric_subgroup.
+      2) Retrieves parameters optionality flags via get_parameters_optionality.
+      3) Combines them into a single dictionary.
+    """
+    subgroup = get_metric_subgroup(metric_name, json_path)
+    optional_flags = get_parameters_optionality(subgroup["metrics"])
+
+    return {
+        "name": subgroup["name"],
+        "metrics": subgroup["metrics"],
         "optional_flags": optional_flags
     }
+
+def build_optional_parameters_text(API_name_list, optional_flags, API_descriptions):
+    """
+    Create a guidance text describing whether (True) or not (False)
+    to include optional parameters for each metric in the user query.
+    """
+    lines = []
+    lines.append("**Optional Parameters Guidance**")
+
+    for metric in API_name_list:
+        # If the metric is missing from optional_flags, skip or default to False
+        flag = optional_flags.get(metric, False)
+        
+        # Get the optional parameters from API_descriptions
+        metric_info = API_descriptions.get(metric, {})
+        optional_params = metric_info.get("optional_parameters", [])
+
+        # If no optional parameters exist, skip the instruction
+        if not optional_params:
+            lines.append(f"- For {metric}: (No optional parameters available)")
+            continue
+
+        # Build a readable list of optional param names
+        param_names = [p["name"] for p in optional_params]
+
+        if flag:
+            lines.append(
+                f"- For {metric}: Please consider including these optional parameters in your user query: {', '.join(param_names)}."
+            )
+        else:
+            lines.append(
+                f"- For {metric}: Do NOT include any optional parameters in your user query."
+            )
+
+    # Join everything into a single text block
+    return "\n".join(lines)
 
 def delete_intermediate_subfolder(subfolder_path):
     """

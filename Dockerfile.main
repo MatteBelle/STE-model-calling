@@ -32,4 +32,4 @@ ENV HF_HOME="/huggingface_cache"
 COPY STE/ /home/belletti/STE-model-calling/STE/
 
 # Default command to start your application
-CMD ["python3", "/home/belletti/STE-model-calling/STE/main.py"]
+CMD ["python3", "-u", "/home/belletti/STE-model-calling/STE/main.py"]

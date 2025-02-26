@@ -1,17 +1,19 @@
 You are an **expert** assisting in evaluation.   
-Your task is to **output a single, well-structured query** that a user might naturally ask when requesting a metric evaluation.  
+Your task is to **output a well-structured user query** that a user might naturally ask when requesting metric evaluation with all of the following metrics.  
 **Context:**
 {api_descriptions}
 
 **Task Instructions:**  
 Generate **one** realistic user query.  
-Rephrase the query request with different formulation to simulate different users approaches.
+Rephrase the query request using different formulations to simulate various user approaches.
 The query should be **concise, natural, and human-like**.  
-The query should **only** request metric evaluation **for a set references and predictions**.    
+The query should **only** request metric evaluation for a set of references and predictions.    
 The query should provide creative references and predictions.  
-**References and prediction lists must both have N entries**   
+**References and prediction lists must both have N entries.**   
 Do **not** add explanations, descriptions, or metadata.  
 Do **not** repeat yourself.
+{optional_parameters}
+The query should *only* use the metrics above following parameters instructions.
 **Stop after outputting the query.**
 
 User Query:
@@ -19,10 +21,10 @@ User Query:
 
 Now, try to respond to the query using the available evaluation metrics.
 
-The format you use for the evaluation metric is by specifying 1) Action: the name of the metric you want to call 2) Action Input: the input parameters for the metric in a JSON string format such that predictions and references have the same number of entries in their lists. The result of the metric call will be returned starting with "Evaluation Result". Remember that you should only perform a SINGLE action at a time; do NOT return a list of multiple actions.
+The format you use for the evaluation metric is by specifying 1) Action: the name of the metric you want to call 2) Action Input: the input parameters for the metric in a JSON string format such that predictions and references have the same number of entries in their lists. The result of the metric call will be returned starting with "Evaluation Result". *If the query requires multiple metrics call, then provide multiple Action and Action Input couples*
 
 Reminder:
-1) The only values that should follow "Action:" are: {metric_name}
+1) The only values that should follow "Action:" is one of: {metric_name}
 2) Use the following JSON string format for the evaluation arguments.
 
 Action Input:
@@ -32,26 +34,34 @@ Action Input:
     "key_n": "value_n",
 }}
 
-Remember to ALWAYS use the following format:
+Always use the following format:
 
-Thought: you should always think about what to do next  
+Thought: Your thought about what to do next  
 Action: the evaluation metric name  
-Action Input: the input parameters for the metric function in JSON string format  
-Evaluation Result: the return result of the evaluation function. This is what I will provide you with;
-... (this Thought/Action/Action Input/Evaluation Result cycle can repeat N times)  
+Action Input: the input parameters for the metric function in JSON string format
+[...]
+Action: the Nth action
+Action input Nth acton input
+Evaluation Result: the return result of the evaluation function. This is what I will provide you with; you do not need to repeat it in your response.
 Thought: I now know the final answer  
-Final Answer: the response to the user query and your consideration on the result and whether other metrics for evaluation could be useful.
+Final Answer: *don't include this if you did not receive values for the Evaluation Result in the prompt*, otherwise what other metrics could help out the evaluation and your comments. 
 
-Begin! Remember that your response should never start with "Evaluation Result:" since that is what I will provide you with. Once you have enough information, please immediately use \nThought: I now know the final answer\nFinal Answer:
+Begin! Remember that your response should never start with "Evaluation Result:" since that is what I will provide you with. **Only in case you received a proper evaluation result with no error** please immediately use  
+\nThought: I now know the final answer\nFinal Answer:
 
 User Query (the same you just synthesized): {query}
 
 =========
 
-Now you know a bit more about the available evaluation metrics. You can synthesize another creative user query (it should differ from the previous ones) to explore the metrics further and consolidate your understanding based on what you discovered. Remember that {placeholder} is a placeholder I use for trimmed texts, so *don't* use {placeholder} it in your queries. Again, just input the user query alone; do NOT solve the query for now.
+Now you know a bit more about the available evaluation metrics. You can synthesize another creative user query (it should differ from the previous one) to explore the metrics further and consolidate your understanding based on what you discovered. Remember that {placeholder} is a placeholder I use for trimmed texts, so *don't* use {placeholder} in your queries. Again, just input the user query alone; do NOT solve the query for now.
+{optional_parameters}
 
 User Query:
-
 =========
 
-Now provide the Action and Action input. Remember to follow the same format, i.e.,\nThought: \nAction: \nAction Input: \nEvaluation Result:\nFinal Answer: 
+Now provide the Action and Action Input cycles. Remember to follow the same format, i.e.,  
+Thought:  
+Action:  
+Action Input:  
+Evaluation Result:  
+Final Answer:

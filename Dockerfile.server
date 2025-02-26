@@ -30,12 +30,10 @@ RUN pip3 install --upgrade pip && \
 ENV HF_HOME="/huggingface_cache"
 RUN mkdir -p /huggingface_cache
 
-# Copy only the necessary files into the container
-ARG CACHEBUST=2
 COPY STE/llm_server.py /home/belletti/STE-model-calling/STE/llm_server.py
 
 # Expose the port that FastAPI will use
 EXPOSE 8000
 
 # Run the server using uvicorn
-CMD ["uvicorn", "llm_server:app", "--host", "0.0.0.0", "--port", "8000"]
+CMD ["python3", "-m", "uvicorn", "llm_server:app", "--host", "0.0.0.0", "--port", "8000"]

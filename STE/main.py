@@ -5,13 +5,15 @@ import numpy as np
 import time
 import fire
 from transformers import pipeline  # Import Hugging Face pipeline
-from utils import find_reverse, random_choose, parse_response, strip_end, delete_intermediate_subfolder, trim_ltm_stm#, get_random_metric_subgroup_with_flags
+from utils import find_reverse, random_choose, parse_response, strip_end, delete_intermediate_subfolder, trim_ltm_stm, get_metric_subgroup, get_parameters_optionality, build_optional_parameters_text
 from my_llm import chat_my, visualize_messages, get_chat_completion_my#, set_tokenizer
 from transformers import AutoTokenizer, AutoModelForCausalLM
 import torch
 from datetime import datetime  # For generating dynamic filenames
 import evaluate
 import random
+
+METRIC_CACHE = {}
 
 def main(
     num_episodes: int = 5,
@@ -21,15 +23,13 @@ def main(
     final_dir_write: str = "STE/results/final_results/",
     if_visualize: bool = True,
 ):
-    temperature=0.6
-    placeholder = "[...]" # used for trimmed LTM lists
-    print("DEBUG: Entering main function with parameters:")
-    print(f"num_episodes={num_episodes}, num_stm_slots={num_stm_slots}, max_turn={max_turn}, final_dir_write={final_dir_write}, if_visualize={if_visualize}")
-    # ---------------------------------------------- Create env for saving results
-    print("DEBUG: Ensuring output directories exists.")
+    temperature = 0.6
+    placeholder = "[...]"  # used for trimmed LTM lists
+    data_dict = dict()
+    print("DEBUG: Ensuring output directories exists.", flush = True)
+
     os.makedirs(final_dir_write, exist_ok=True)
     os.makedirs(intermediate_dir_write, exist_ok=True)
-    data_dict = dict()
     # Create a unique subfolder inside intermediate_dir_write
     run_timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     subfolder_path = os.path.join(intermediate_dir_write, f"run_{run_timestamp}")
@@ -39,52 +39,66 @@ def main(
     subfolder_info_path = os.path.join(intermediate_dir_write, "latest_run_subfolder.txt")
     with open(subfolder_info_path, "w") as f:
         f.write(subfolder_path)
-    print(f"DEBUG: Intermediate results will be stored in: {subfolder_path}")
+    print(f"DEBUG: Intermediate results will be stored in: {subfolder_path}", flush = True)
+
     # ----------------------------------------------
-    print("DEBUG: Loading API descriptions and API list from JSON files.")
+    print("DEBUG: Entering main function with parameters:", flush=True)
+    print(f"num_episodes={num_episodes}, num_stm_slots={num_stm_slots}, max_turn={max_turn}, final_dir_write={final_dir_write}, if_visualize={if_visualize}", flush=True)
+    # ... [setup and directory creation as before]
+
+    # Load API descriptions and API list.
     with open("STE/tool_metadata/API_descriptions.json", "r", encoding='utf-8') as f:
         API_descriptions = json.load(f)
     with open("STE/tool_metadata/API_list.json", "r", encoding='utf-8') as f:
         API_list = json.load(f)
     data_dict["ALL_METRICS"] = API_list
     data_dict["ALL_METRICS_DESCRIPTIONS"] = API_descriptions
-    # Memory and reflection prompts (unchanged)
+
+    # Memory and reflection prompts remain unchanged.
     PAST_Q_MSG_pre = "Below are queries you have already explored and whether you successfully solved them with the API's help:"
-    PAST_Q_MSG_post = f"Based on these, try to explore queries that can help you understand the API further; avoid synthesizing queries that are too close to the existing ones and remember that {placeholder} is a placeholder I use for trimmed texts, so don't use {placeholder} it in your queries. Try different ways to formulate the query (use synonyms, vary its structure, vary the length of the question, etc.)."
+    PAST_Q_MSG_post = f"Based on these, try to explore queries that can help you understand the API further; avoid synthesizing queries that are too close to the existing ones and remember that {placeholder} is a placeholder I use for trimmed texts, so don't use {placeholder} it in your queries. Try different ways to formulate the query (use synonyms, vary its structure, vary the length of the question, change the references parameters etc.)."
     prompt_reflection = "Do you think you successfully fulfilled this query in the end? Respond with \"Yes\" or \"No\"."
 
-    print("DEBUG: Starting iteration over API_list.")
+    print("DEBUG: Starting iteration over API_list.", flush=True)
     for API in API_list:
-        print("DEBUG: Processing API:", API)
-        API_name_list = [API]
+        print("DEBUG: Processing API:", API, flush=True)
+        #API_name_list = [API] + (API_list[3:4] if len(API_list) > 3 else [])
 
         with open("STE/prompts/prompt_explore.txt", "r") as f:
-            prompt_template = f.read().strip() #TOCHECK 15/02
-            #prompt_template = f.read()
+            prompt_template = f.read().strip()
 
         template_q, template_a, template_q_follow, template_a_follow = prompt_template.split("=========")
-        template_q, template_a, template_q_follow, template_a_follow = template_q.strip(), template_a.strip(), template_q_follow.strip(), template_a_follow.strip() #TOCHECK 15/02
-        template_q_follow = template_q_follow.format(placeholder=placeholder)
+        template_q, template_a, template_q_follow, template_a_follow = template_q.strip(), template_a.strip(), template_q_follow.strip(), template_a_follow.strip()
+        #template_q_follow = template_q_follow.format(placeholder=placeholder) commented as it's later formatted with optionality as well.
         all_sessions, explored_queries, whether_successful = [], [], []
-        # LOOP on the SAME API with the SAME MEMORY --> num_episodes
         for session_id in range(num_episodes):
-            print("DEBUG: Starting episode:", session_id)
+            print("DEBUG: Starting episode:", session_id, flush = True)    
+            # Extract subgroups that includes (API) and parameters optionality    
+            subgroup = get_metric_subgroup(API)
+            API_name_list = subgroup["metrics"]
+            optional_flags = get_parameters_optionality(API_name_list)
+            
             item_list = []
             first_item = dict()
             api_descriptions_text = "\n\n".join(["API_name: {}\nDescription: {}".format(temp, API_descriptions[temp]) for temp in API_name_list])
+            optional_parameters_text = build_optional_parameters_text(
+                API_name_list,
+                optional_flags,
+                API_descriptions
+            )
+            # Prompt for query formatted
             prompt_q = template_q.format(
                 api_descriptions=api_descriptions_text,
+                optional_parameters=optional_parameters_text
             )
 
             if len(explored_queries) > 0:
-                #assert prompt_q.endswith("User Query:")
                 try:
                     assert prompt_q.endswith("User Query:")
                 except AssertionError:
-                    print(f"DEBUG: Assertion failed! prompt_q does not end with 'User Query:'. Tail of prompt_q: {prompt_q[-20:]}")
-                    raise  # Re-raise the exception after logging
-                prompt_q_added_question = strip_end(prompt_q, "User Query:").strip() #TOCHECK 15/02
-                #prompt_q_added_question = strip_end(prompt_q, "User Query:")                
+                    print(f"DEBUG: Assertion failed! prompt_q does not end with 'User Query:'. Tail of prompt_q: {prompt_q[-20:]}", flush=True)
+                    raise
+                prompt_q_added_question = strip_end(prompt_q, "User Query:").strip()
                 prompt_q_added_question = prompt_q_added_question + "\n\n" + \
                     PAST_Q_MSG_pre + "\n" + "\n".join(trim_ltm_stm(LTM(explored_queries, whether_successful), placeholder=placeholder)) + \
                     "\n\n" + PAST_Q_MSG_post + "\n\nUser Query:"
@@ -95,7 +109,7 @@ def main(
                 {"role": "system", "content": "You are a helpful assistant."}
             ]
 
-            print("DEBUG: Generating the first query using chat_my.")
+            print("DEBUG: Generating the first query using chat_my.", flush=True)
             response = chat_my(messages, prompt_q_added_question,
                                temp=temperature, stop="Thought:", visualize=if_visualize, max_tokens=512)[-1]['content']
 
@@ -103,9 +117,9 @@ def main(
                 {"role": "user", "content": prompt_q},
                 {"role": "assistant", "content": response}
             ]
-            print("DEBUG FIRST USER QUERY OF SESSION " + str(session_id) +  ": \n" + prompt_q_added_question+"\n\n\n\n")
-            print("DEBUG FIRST RESPONSE OF SESSION ------------------------------------------------------" + str(session_id) +  ": \n" + response)
-            print("DEBUG END: --------------------------------------------------------------------------------------------------------------\n\n\n\n\n\n\n\n")
+            print("DEBUG FIRST USER QUERY OF SESSION " + str(session_id) +  ": \n" + prompt_q_added_question+"\n\n\n\n", flush=True)
+            print("DEBUG FIRST RESPONSE OF SESSION " + str(session_id) +  ": \n" + response, flush=True)
+            print("DEBUG END: --------------------------------------------------------------------------------------------------------------\n\n\n\n\n\n\n\n", flush=True)
 
             query = messages[-1]['content']
             prompt_a = template_a.format(
@@ -116,51 +130,50 @@ def main(
             explored_queries.append(query)
 
             chains = []
-            print("DEBUG: Processing chain of calls for the first query.")
+            print("DEBUG: Processing chain of calls for the first query.", flush=True)
             messages = chat_my(messages, prompt_a, temp=temperature, stop="Evaluation Result:", visualize=if_visualize, max_tokens=512)            
             temp = messages[-1]['content']
-            
-            print("DEBUG FIRST USER ANSWER OF SESSION " + str(session_id) +  ": \n" + messages[-2]['content'] +"\n\n\n\n")
-            print("DEBUG FIRST ACTION AND INPUT OF SESSION ------------------------------------------------------" + str(session_id) +  ": \n" + temp)
-            print("DEBUG END: --------------------------------------------------------------------------------------------------------------\n\n\n\n\n\n\n\n")
+
+            print("DEBUG FIRST USER ANSWER OF SESSION " + str(session_id) +  ": \n" + messages[-2]['content'] +"\n\n\n\n", flush=True)
+            print("DEBUG FIRST ACTION AND INPUT OF SESSION " + str(session_id) +  ": \n" + temp, flush=True)
+            print("DEBUG END: --------------------------------------------------------------------------------------------------------------\n\n\n\n\n\n\n\n", flush=True)
             
             parsed_response = parse_response(temp, API_name_list, API_descriptions)
-            # LOOP on the SAME API ACTION AND ACTION INPUT UNTIL THEY ARE CORRECT with the SAME MEMORY UNTIL SUCCESFUL --> max_turn
             for n_turn in range(max_turn):
                 if not parsed_response['parse_successful']:
                     evaluation_result = parsed_response['parse_error_msg']
                 else:
-                    if parsed_response['finish']:
-                        print("DEBUGDEBUGDEBUG: MAIN RICONOSCE CHE LA TASK E' FINITA, PROSSIMO EPISODE")
+                    if parsed_response.get('finish', False):
+                        print("DEBUG: Final answer reached. Moving to next episode.", flush=True)
                         chains.append(parsed_response)
                         break
                     else:
-                        evaluation_result = run_evaluation(parsed_response['action'], parsed_response['action_input'], API_list, API_descriptions)
+                        evaluation_result = ""
+                        # Loop over each extracted action and call run_evaluation.
+                        for act in parsed_response['actions']:
+                            evaluation_result += run_evaluation(act['action'], act['action_input'], API_list, API_descriptions) + "\n"
                 parsed_response['evaluation_result'] = evaluation_result
                 chains.append(parsed_response)
 
                 messages = chat_my(messages, 'Evaluation Result: ' + evaluation_result,
                                    temp=temperature, stop="Evaluation Result:", visualize=if_visualize, max_tokens=512)
-
                 temp = messages[-1]['content']
-                
-                print("DEBUG USER QUERY OF SESSION " + str(session_id) + ", TURN " + str(n_turn) + ", PARSING ACTION AND INPUT: \n" + messages[-2]['content'] + "\n\n\n\n")
-                print("DEBUG RESPONSE OF SESSION ------------------------------------------------------" + str(session_id) + ", TURN " + str(n_turn) + ", PARSING ACTION AND INPUT: \n" + temp)
-                print("DEBUG END: --------------------------------------------------------------------------------------------------------------\n\n\n\n\n\n\n\n")
+                print("DEBUG USER QUERY OF SESSION " + str(session_id) + ", TURN " + str(n_turn) + ", PARSING ACTION AND INPUT: \n" + messages[-2]['content'] + "\n\n\n\n", flush=True)
+                print("DEBUG RESPONSE OF SESSION " + str(session_id) + ", TURN " + str(n_turn) + ", PARSING ACTION AND INPUT: \n" + temp, flush=True)
+                print("DEBUG END: --------------------------------------------------------------------------------------------------------------\n\n\n\n\n\n\n\n", flush=True)
                 
                 parsed_response = parse_response(temp, API_name_list, API_descriptions)
-
-            if len(chains) == 0 or not chains[-1]['finish']:
+            if len(chains) == 0 or not parsed_response.get('finish', False):
                 chains.append(parsed_response)
 
             first_item['chains'] = chains
 
-            print("DEBUG: Running reflection to determine success for the first query.")
+            print("DEBUG: Running reflection to determine success for the first query.", flush=True)
             messages = chat_my(messages, prompt_reflection, temp=temperature, stop="Evaluation Result:", visualize=if_visualize, max_tokens=512)
             res = messages[-1]['content']
-            print("DEBUG USER QUERY REFLECTION OF SESSION " + str(session_id) + ", TURN " + str(n_turn) + ": \n" + prompt_reflection + "\n\n\n\n")
-            print("DEBUG RESPONSE OF SESSION ------------------------------------------------------" + str(session_id) + ", TURN " + str(n_turn) + ": \n" + res)
-            print("DEBUG END: --------------------------------------------------------------------------------------------------------------\n\n\n\n\n\n\n\n")
+            print("DEBUG USER QUERY REFLECTION OF SESSION " + str(session_id) + ": \n" + prompt_reflection + "\n\n\n\n", flush=True)
+            print("DEBUG RESPONSE OF SESSION " + str(session_id) + ": \n" + res, flush=True)
+            print("DEBUG END: --------------------------------------------------------------------------------------------------------------\n\n\n\n\n\n\n\n", flush=True)
             
             if "No" in res:
                 successful = "No"
@@ -171,40 +184,46 @@ def main(
 
             item_list.append(first_item)
 
+            # Process additional STM slots similarly.
             for n_stm in range(num_stm_slots-1):
                 item = dict()
-
+                new_optional_flags = get_parameters_optionality(API_name_list)
+                optional_parameters_text = build_optional_parameters_text(API_name_list,new_optional_flags,API_descriptions)
+                # Prompt for query formatted
+                template_q_follow = template_q_follow.format(
+                    placeholder = placeholder,
+                    optional_parameters=build_optional_parameters_text(API_name_list,new_optional_flags,API_descriptions)
+                )
+                    
                 if len(explored_queries) > 0:
-                    #assert template_q_follow.endswith("User Query:")
                     try:
                         assert template_q_follow.endswith("User Query:")
                     except AssertionError:
-                        print(f"DEBUG: Assertion failed! prompt_q_follow does not end with 'User Query:'. Tail of prompt_q: {template_q_follow[-20:]}")
-                        raise  # Re-raise the exception after logging
-                    template_q_follow_added_question = strip_end(template_q_follow, "User Query:").strip() # TOCHECK 15/02
-                    #template_q_follow_added_question = strip_end(template_q_follow, "User Query:")
+                        print(f"DEBUG: Assertion failed! prompt_q_follow does not end with 'User Query:'. Tail of prompt_q_follow: {template_q_follow[-20:]}", flush=True)
+                        raise
+                    template_q_follow_added_question = strip_end(template_q_follow, "User Query:").strip()
                     template_q_follow_added_question = template_q_follow_added_question + "\n\n" + \
                     PAST_Q_MSG_pre + "\n" + "\n".join(trim_ltm_stm(LTM(explored_queries, whether_successful), placeholder=placeholder)) + \
                     "\n\n" + PAST_Q_MSG_post + "\n\nUser Query:"
                 else:
                     template_q_follow_added_question = template_q_follow
 
-                print("DEBUG: Generating follow-up query using chat_my.")
+                print("DEBUG: Generating follow-up query using chat_my.", flush=True)
                 response = chat_my(messages, template_q_follow_added_question,
                                    temp=temperature, stop="Thought:", visualize=if_visualize, max_tokens=512)[-1]['content']
                 messages = messages + [
                     {"role": "user", "content": template_q_follow_added_question},
                     {"role": "assistant", "content": response}
                 ]
-                print("DEBUG USER QUERY REFLECTION OF SESSION " + str(session_id) + ", STM TURN " + str(n_stm) + ": \n" + template_q_follow_added_question + "\n\n\n\n")
-                print("DEBUG RESPONSE OF SESSION ------------------------------------------------------" + str(session_id) + ", STM TURN " + str(n_stm) + ": \n" + response)
-                print("DEBUG END: --------------------------------------------------------------------------------------------------------------\n\n\n\n\n\n\n\n")
+                print("DEBUG USER QUERY REFLECTION OF SESSION " + str(session_id) + ", STM TURN " + str(n_stm) + ": \n" + template_q_follow_added_question + "\n\n\n\n", flush=True)
+                print("DEBUG RESPONSE OF SESSION " + str(session_id) + ", STM TURN " + str(n_stm) + ": \n" + response, flush=True)
+                print("DEBUG END: --------------------------------------------------------------------------------------------------------------\n\n\n\n\n\n\n\n", flush=True)
                 query = messages[-1]['content']
                 item['query'] = query
                 explored_queries.append(query)
 
                 chains = []
-                print("DEBUG: Processing chain of calls for the short-term memory slot query.")
+                print("DEBUG: Processing chain of calls for the short-term memory slot query.", flush=True)
                 messages = chat_my(messages, template_a_follow,
                                    temp=temperature, stop="Evaluation Result:", visualize=if_visualize, max_tokens=512)
                 temp = messages[-1]['content']
@@ -213,34 +232,35 @@ def main(
                     if not parsed_response['parse_successful']:
                         evaluation_result = parsed_response['parse_error_msg']
                     else:
-                        if parsed_response['finish']:
+                        if parsed_response.get('finish', False):
                             chains.append(parsed_response)
                             break
                         else:
-                            evaluation_result = run_evaluation(parsed_response['action'], parsed_response['action_input'], API_list, API_descriptions)
+                            evaluation_result = ""
+                            for act in parsed_response['actions']:
+                                evaluation_result += run_evaluation(act['action'], act['action_input'], API_list, API_descriptions) + "\n"
                     parsed_response['evaluation_result'] = evaluation_result
                     chains.append(parsed_response)
 
-                    messages = chat_my(messages, 'Evaluation Result: '+ evaluation_result,
+                    messages = chat_my(messages, 'Evaluation Result: ' + evaluation_result,
                                        temp=temperature, stop="Evaluation Result:", visualize=if_visualize, max_tokens=512)
                     temp = messages[-1]['content']
-                    print("DEBUG USER QUERY OF SESSION " + str(session_id) + ", TURN " + str(n_turn) + ", PARSING ACTION AND INPUT: \n" + messages[-2]['content'] + "\n\n\n\n")
-                    print("DEBUG RESPONSE OF SESSION ------------------------------------------------------" + str(session_id) + ", TURN " + str(n_turn) + ", PARSING ACTION AND INPUT: \n" + temp)
-                    print("DEBUG END: --------------------------------------------------------------------------------------------------------------\n\n\n\n\n\n\n\n")
+                    print("DEBUG USER QUERY OF SESSION " + str(session_id) + ", TURN " + str(n_turn) + ", PARSING ACTION AND INPUT: \n" + messages[-2]['content'] + "\n\n\n\n", flush=True)
+                    print("DEBUG RESPONSE OF SESSION " + str(session_id) + ", TURN " + str(n_turn) + ", PARSING ACTION AND INPUT: \n" + temp, flush=True)
+                    print("DEBUG END: --------------------------------------------------------------------------------------------------------------\n\n\n\n\n\n\n\n", flush=True)
                     parsed_response = parse_response(temp, API_name_list, API_descriptions)
-
-                if len(chains) == 0 or not chains[-1]['finish']:
+                if len(chains) == 0 or not parsed_response.get('finish', False):
                     chains.append(parsed_response)
 
                 item['chains'] = chains
 
-                print("DEBUG: Running reflection to determine success for the short-term memory slot query.")
+                print("DEBUG: Running reflection to determine success for the short-term memory slot query.", flush=True)
                 messages = chat_my(messages, prompt_reflection,
                                    temp=temperature, stop="Evaluation Result:", visualize=if_visualize, max_tokens=512)
                 res = messages[-1]['content']
-                print("DEBUG USER QUERY REFLECTION OF SESSION " + str(session_id) + ", TURN " + str(n_turn) + ": \n" + messages[-2]['content'] + "\n\n\n\n")
-                print("DEBUG RESPONSE OF SESSION ------------------------------------------------------" + str(session_id) + ", TURN " + str(n_turn) + ": \n" + res)
-                print("DEBUG END: --------------------------------------------------------------------------------------------------------------\n\n\n\n\n\n\n\n")
+                print("DEBUG USER QUERY REFLECTION OF SESSION " + str(session_id) + ", TURN " + str(n_turn) + ": \n" + messages[-2]['content'] + "\n\n\n\n", flush=True)
+                print("DEBUG RESPONSE OF SESSION " + str(session_id) + ", TURN " + str(n_turn) + ": \n" + res, flush=True)
+                print("DEBUG END: --------------------------------------------------------------------------------------------------------------\n\n\n\n\n\n\n\n", flush=True)
                 if "No" in res:
                     successful = "No"
                 else:
@@ -254,8 +274,6 @@ def main(
                     "messages": messages,
                 }
             )
-            # Save intermediate results right after each session
-            #save_intermediate_results(API, session_id, all_sessions, subfolder_path)
         save_intermediate_results(API, 99, all_sessions, subfolder_path)
         data_dict[API] = all_sessions
     final_data_path = os.path.join(final_dir_write, f"data_dict_{run_timestamp}.json")
@@ -263,8 +281,8 @@ def main(
     with open(final_data_path, "w", encoding='utf-8') as f:
         json.dump(data_dict, f)
     delete_intermediate_subfolder(subfolder_path)
-    print(f"DEBUG: Final data saved to {final_data_path}")
-    print("DEBUG: Finished main function.")
+    print(f"DEBUG: Final data saved to {final_data_path}", flush=True)
+    print("DEBUG: Finished main function.", flush=True)
 
 
 def LTM(X, labels):
@@ -272,9 +290,9 @@ def LTM(X, labels):
     try:
         assert len(X) == len(labels)
     except AssertionError:
-        print(f"DEBUG: Assertion failed! len(X) == len(labels) '. len(X) {len(X)}, len(labels) {len(labels)}")
+        print(f"DEBUG: Assertion failed! len(X, flush=True) == len(labels) '. len(X) {len(X)}, len(labels) {len(labels)}")
         raise  # Re-raise the exception after logging
-    print("DEBUG: LTMLTM: " + str(["Query: {} \n Solved: {}".format(X[i], labels[i]) for i in range(len(X))]))
+    print("DEBUG: LTMLTM: " + str(["Query: {} \n Solved: {}".format(X[i], labels[i], flush=True) for i in range(len(X))]))
     return ["Query: {} \n Solved: {}".format(X[i], labels[i]) for i in range(len(X))]
 
 def normalize_evaluation_args(metric_name, args, API_descriptions):
@@ -288,14 +306,14 @@ def normalize_evaluation_args(metric_name, args, API_descriptions):
         # Load metadata for the metric (the value is a JSON string)
         metric_meta = API_descriptions[metric_name]
     except Exception as e:
-        print(f"DEBUG: Error loading metadata for {metric_name}: {e}")
+        print(f"DEBUG: Error loading metadata for {metric_name}: {e}", flush=True)
         metric_meta = {}
 
     normalized_args = {}
 
     # Merge "kwargs" into the main args dictionary if present
     if "kwargs" in args and isinstance(args["kwargs"], dict):
-        print("DEBUG: Expanding 'kwargs' into args.")
+        print("DEBUG: Expanding 'kwargs' into args.", flush=True)
         args.update(args.pop("kwargs"))
 
     # Get a list of expected parameters from required and optional parameters.
@@ -344,7 +362,7 @@ def normalize_evaluation_args(metric_name, args, API_descriptions):
                 else:
                     normalized_args[key] = value
             except Exception as e:
-                print(f"DEBUG: Error normalizing parameter '{key}' with value '{value}': {e}")
+                print(f"DEBUG: Error normalizing parameter '{key}' with value '{value}': {e}", flush=True)
                 normalized_args[key] = value
     return normalized_args
 
@@ -353,34 +371,42 @@ def run_evaluation(metric_name, args, API_list, API_descriptions, truncate=False
     """
     Execute an evaluation metric from Hugging Face evaluate.
     """
+    global METRIC_CACHE
     if metric_name not in API_list:
         raise ValueError(f"Metric '{metric_name}' is not supported. Supported metrics are: {API_list}")
     try:
         # Normalize the input arguments using the metadata.
-        print(f"DEBUG: Normalizing evaluation arguments for metric '{metric_name}'")
-        print(f"DEBUG: Arguments before normalization: {args}")
+        print(f"DEBUG: Normalizing evaluation arguments for metric '{metric_name}'", flush=True)
+        print(f"DEBUG: Arguments before normalization: {args}", flush=True)
         normalized_args = normalize_evaluation_args(metric_name, args, API_descriptions)
-        print("DEBUG: EVALUATIONEVALUATIONEVALUATIONEVALUATION: NORMALIZED ARGS = " + str(normalized_args))
-        metric = evaluate.load(metric_name)
-        # Compute the metric using the normalized arguments.
-        # Force model_type for bertscore for GPU limitations.
-        #I still want the model to try different prompts but don't want memory to get filled up
+        print("DEBUG: EVALUATIONEVALUATIONEVALUATIONEVALUATION: NORMALIZED ARGS = " + str(normalized_args), flush=True)
+        
+        # Use the cache to load the metric only once.
+        if metric_name not in METRIC_CACHE:
+            METRIC_CACHE[metric_name] = evaluate.load(metric_name)
+        metric = METRIC_CACHE[metric_name]
+        
+        # Special cases for specific metrics.
         if metric_name == "bertscore":
-            print("DEBUG: Overriding model_type for bertscore to 'google/bert_uncased_L-2_H-128_A-2'")
+            print("DEBUG: Overriding model_type for bertscore to 'google/bert_uncased_L-2_H-128_A-2'", flush=True)
             normalized_args["model_type"] = "google/bert_uncased_L-2_H-128_A-2"
         if metric_name == "perplexity":
-            print("DEBUG: Overriding model_id for perplexity to 'gpt-2'") 
+            print("DEBUG: Overriding model_id for perplexity to 'gpt-2'", flush=True) 
             normalized_args["model_id"] = "gpt2"
+        
         result = metric.compute(**normalized_args)
-        print("DEBUG: EVALUATIONEVALUATIONEVALUATIONEVALUATION RESULT = " + str(result))
+        print("DEBUG: EVALUATIONEVALUATIONEVALUATIONEVALUATION RESULT = " + str(result), flush=True)
         result_str = json.dumps(result)
-        print("DEBUG: EVALUATIONEVALUATIONEVALUATIONEVALUATION RESULT JSONED = " + str(result_str))
+        print("DEBUG: EVALUATIONEVALUATIONEVALUATIONEVALUATION RESULT JSONED = " + str(result_str), flush=True)
         if truncate:
             result_str = result_str[:truncate]
+        # # Optionally free up GPU memory. From instantiations of the loop before
+        # if torch.cuda.is_available():
+        #     torch.cuda.empty_cache()
         return result_str
     except Exception as e:
-            print("DEBUG ERROR IN EVALUATIONEVALUATIONEVALUATIONEVALUATION: " + str(e))
-            return f"The Action or Action Input is incorrect: {str(e)}. Fix it and provide new Action or Action input."
+        print("DEBUG ERROR IN EVALUATIONEVALUATIONEVALUATIONEVALUATION: " + str(e), flush=True)
+        return f"The Action or Action Input is incorrect: {str(e)}. Fix it and provide new Action or Action input."
 
 def save_intermediate_results(API, session_id, all_sessions, subfolder_path):
     """
@@ -398,9 +424,9 @@ def save_intermediate_results(API, session_id, all_sessions, subfolder_path):
                 "all_sessions_so_far": all_sessions
             }, f, ensure_ascii=False, indent=2)
 
-        print(f"DEBUG: Intermediate results saved to {intermediate_filename}")
+        print(f"DEBUG: Intermediate results saved to {intermediate_filename}", flush=True)
     except Exception as e:
-        print(f"DEBUG: Error saving intermediate results: {e}")
+        print(f"DEBUG: Error saving intermediate results: {e}", flush=True)
 
 def sanitize_for_json(obj):
     if isinstance(obj, (np.integer, np.int64)):
