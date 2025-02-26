@@ -192,7 +192,7 @@ def get_parameters_optionality(metrics):
     """
     optional_flags = {}
     for metric in metrics:
-        optional_flags[metric] = (random.random() < 0.3)
+        optional_flags[metric] = (random.random() < 0.6)
     return optional_flags
 
 def get_random_metric_subgroup_with_flags(
@@ -220,7 +220,7 @@ def build_optional_parameters_text(API_name_list, optional_flags, API_descriptio
     to include optional parameters for each metric in the user query.
     """
     lines = []
-    lines.append("**Optional Parameters Guidance**")
+    lines.append("**Parameters Mandatory Instructions**")
 
     for metric in API_name_list:
         # If the metric is missing from optional_flags, skip or default to False
@@ -240,12 +240,14 @@ def build_optional_parameters_text(API_name_list, optional_flags, API_descriptio
 
         if flag:
             lines.append(
-                f"- For {metric}: Please consider including these optional parameters in your user query: {', '.join(param_names)}."
+                f"- For {metric}: You MUST include these optional parameters in your user query: {', '.join(param_names)}."
             )
         else:
             lines.append(
                 f"- For {metric}: Do NOT include any optional parameters in your user query."
             )
+    
+    lines.append("In case optional parameters arae asked to be included, the query must explicitly specify both the parameters and a chosen value.")
 
     # Join everything into a single text block
     return "\n".join(lines)

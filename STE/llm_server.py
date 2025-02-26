@@ -74,7 +74,10 @@ async def generate_text(request: InferenceRequest):
         generated_text = tokenizer.decode(output_tokens[0], skip_special_tokens=True)
         del inputs, output_tokens
         torch.cuda.empty_cache()
-        print("GENERATED TEXT= ", str(generated_text), flush=True)
+        if generated_text:
+            print("GENERATED TEXT last char= ", generated_text[-1], flush=True)
+        else:
+            print("No generated text", flush=True)
         return {"response": generated_text}
     except Exception as e:
         # Ensure memory is cleared even on error

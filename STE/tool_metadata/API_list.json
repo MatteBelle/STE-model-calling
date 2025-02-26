@@ -1,4 +1,5 @@
 [  
+  "llm_judge",  
   "bertscore",
   "accuracy",
   "exact_match",

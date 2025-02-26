@@ -1,4 +1,3 @@
-
 {
     "_meta": {
         "note": "All JSON examples must be in valid JSON format. Ensure correct use of double quotes, lists, and closing brackets."
@@ -88,7 +87,7 @@
             "references": [
                 [
                     "the cat is sitting on the mat",
-                    "the cat is laying on the mat" 
+                    "the cat is laying on the mat"
                 ],
                 [
                     "a fast brown fox jumps over the lazy dog",
@@ -156,19 +155,19 @@
             }
         ],
         "optional_parameters": [
-          {
-              "name": "batch_size",
-              "type": "INT",
-              "description": "the batch size to run texts through the model.",
-              "default": "16"
-          },
-          {
-              "name": "add_start_token",
-              "type": "BOOLEAN",
-              "description": "whether to add the start token to the texts, so the perplexity can include the probability of the first word.",
-              "default": "true"
-          }
-      ],
+            {
+                "name": "batch_size",
+                "type": "INT",
+                "description": "the batch size to run texts through the model.",
+                "default": "16"
+            },
+            {
+                "name": "add_start_token",
+                "type": "BOOLEAN",
+                "description": "whether to add the start token to the texts, so the perplexity can include the probability of the first word.",
+                "default": "true"
+            }
+        ],
         "example": {
             "texts": [
                 "The quick brown fox jumps over the lazy dog.",
@@ -194,22 +193,32 @@
             }
         ],
         "optional_parameters": [
-          {
-            "name": "normalize",
-            "type": "BOOLEAN",
-            "description": "If set to false, returns the number of correctly classified samples. Otherwise, returns the fraction of correctly classified samples",
-            "default": "true"
-          },
-          {
-            "name": "sample_weight",
-            "type": "LIST of FLOAT",
-            "description": "Predicted labels",
-            "default": "None"
-          }
+            {
+                "name": "normalize",
+                "type": "BOOLEAN",
+                "description": "If set to false, returns the number of correctly classified samples. Otherwise, returns the fraction of correctly classified samples",
+                "default": "true"
+            },
+            {
+                "name": "sample_weight",
+                "type": "LIST of FLOAT",
+                "description": "Predicted labels",
+                "default": "None"
+            }
         ],
         "example": {
-            "predictions": [1, 0, 1, 1],
-            "references": [1, 1, 1, 0]
+            "predictions": [
+                1,
+                0,
+                1,
+                1
+            ],
+            "references": [
+                1,
+                1,
+                1,
+                0
+            ]
         }
     },
     "exact_match": {
@@ -229,34 +238,42 @@
             }
         ],
         "optional_parameters": [
-          {
-              "name": "regexes_to_ignore",
-              "type": "LIST of STRING",
-              "description": "Regex expressions of characters to ignore when calculating the exact matches.",
-              "default": "None"
-          },
-          {
-              "name": "ignore_case",
-              "type": "BOOLEAN",
-              "description": "If true, turns everything to lowercase so that capitalization differences are ignored.",
-              "default": "false"
-          },
-          {
-              "name": "ignore_numbers (bool)",
-              "type": "BOOLEAN",
-              "description": "If true, removes all digits before comparing strings",
-              "default": "false"
-          },
-          {
-              "name": "ignore_punctuation (bool)",
-              "type": "BOOLEAN",
-              "description": "If true, removes punctuation before comparing strings.",
-              "default": "false"
-          }
-      ],
+            {
+                "name": "regexes_to_ignore",
+                "type": "LIST of STRING",
+                "description": "Regex expressions of characters to ignore when calculating the exact matches.",
+                "default": "None"
+            },
+            {
+                "name": "ignore_case",
+                "type": "BOOLEAN",
+                "description": "If true, turns everything to lowercase so that capitalization differences are ignored.",
+                "default": "false"
+            },
+            {
+                "name": "ignore_numbers (bool)",
+                "type": "BOOLEAN",
+                "description": "If true, removes all digits before comparing strings",
+                "default": "false"
+            },
+            {
+                "name": "ignore_punctuation (bool)",
+                "type": "BOOLEAN",
+                "description": "If true, removes punctuation before comparing strings.",
+                "default": "false"
+            }
+        ],
         "example": {
-            "predictions": ["Paris","London","Berlin"],
-            "references": ["Paris","London","Rome"]
+            "predictions": [
+                "Paris",
+                "London",
+                "Berlin"
+            ],
+            "references": [
+                "Paris",
+                "London",
+                "Rome"
+            ]
         }
     },
     "recall": {
@@ -302,8 +319,18 @@
             }
         ],
         "example": {
-            "predictions": [1,0,1,0],
-            "references": [1,1,1,0]
+            "predictions": [
+                1,
+                0,
+                1,
+                0
+            ],
+            "references": [
+                1,
+                1,
+                1,
+                0
+            ]
         }
     },
     "f1": {
@@ -331,8 +358,72 @@
             }
         ],
         "example": {
-            "predictions": [1,0,1,0],
-            "references": [1,1,0,0]
+            "predictions": [
+                1,
+                0,
+                1,
+                0
+            ],
+            "references": [
+                1,
+                1,
+                0,
+                0
+            ]
+        }
+    },
+    "llm_judge": {
+        "description": "LLM Judge uses a language model's own evaluation capabilities to assess the quality of a candidate text from multiple perspectives. Given a candidate text, a set of quality criteria, and optionally reference texts, the model returns a score (on a defined scale) and, if requested, a detailed explanation of its judgment.",
+        "required_parameters": [
+            {
+                "name": "candidate_texts",
+                "type": "LIST of STRING",
+                "description": "The texts whose quality is to be evaluated.",
+                "default": ""
+            },
+            {
+                "name": "quality_criteria",
+                "type": "LIST of STRING",
+                "description": "A list of aspects to evaluate (e.g., coherence, creativity, relevance, fluency).",
+                "default": ""
+            },
+            {
+                "name": "scale_max",
+                "type": "NUMBER",
+                "description": "The maximum value on the evaluation scale (e.g., 10 means scores will be in the range 0-10).",
+                "default": ""
+            }
+        ],
+        "optional_parameters": [
+            {
+                "name": "explanation_required",
+                "type": "BOOLEAN",
+                "description": "If true, the LLM should provide a textual explanation along with the score.",
+                "default": "false"
+            },
+            {
+                "name": "evaluation_type",
+                "type": "STRING",
+                "description": "The type of evaluation to perform (e.g., 'numeric', 'binary', 'qualitative'). Defaults to 'numeric'.",
+                "default": "numeric"
+            },
+            {
+                "name": "prompt_template",
+                "type": "STRING",
+                "description": "A custom prompt template to guide the LLM's evaluation process, if desired.",
+                "default": ""
+            }
+        ],
+        "example": {
+            "candidate_text": "The movie was breathtaking with its stunning visuals and unpredictable plot twists.",
+            "quality_criteria": [
+                "coherence",
+                "creativity",
+                "relevance"
+            ],
+            "scale_max": 10,
+            "explanation_required": true,
+            "evaluation_type": "numeric"
         }
     }
-  }
+}

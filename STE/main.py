@@ -14,6 +14,7 @@ import evaluate
 import random
 
 METRIC_CACHE = {}
+TEMPERATURE = 0.4
 
 def main(
     num_episodes: int = 5,
@@ -23,7 +24,6 @@ def main(
     final_dir_write: str = "STE/results/final_results/",
     if_visualize: bool = True,
 ):
-    temperature = 0.6
     placeholder = "[...]"  # used for trimmed LTM lists
     data_dict = dict()
     print("DEBUG: Ensuring output directories exists.", flush = True)
@@ -106,12 +106,12 @@ def main(
                 prompt_q_added_question = prompt_q
 
             messages = [
-                {"role": "system", "content": "You are a helpful assistant."}
+                {"role": "system", "content": "You are a bot that creates and responds to evaluation queries."}
             ]
 
             print("DEBUG: Generating the first query using chat_my.", flush=True)
             response = chat_my(messages, prompt_q_added_question,
-                               temp=temperature, stop="Thought:", visualize=if_visualize, max_tokens=512)[-1]['content']
+                               temp=TEMPERATURE, stop="Thought:", visualize=if_visualize, max_tokens=512)[-1]['content']
 
             messages = messages + [
                 {"role": "user", "content": prompt_q},
@@ -131,7 +131,7 @@ def main(
 
             chains = []
             print("DEBUG: Processing chain of calls for the first query.", flush=True)
-            messages = chat_my(messages, prompt_a, temp=temperature, stop="Evaluation Result:", visualize=if_visualize, max_tokens=512)            
+            messages = chat_my(messages, prompt_a, temp=TEMPERATURE, stop="Evaluation Result:", visualize=if_visualize, max_tokens=512)            
             temp = messages[-1]['content']
 
             print("DEBUG FIRST USER ANSWER OF SESSION " + str(session_id) +  ": \n" + messages[-2]['content'] +"\n\n\n\n", flush=True)
@@ -156,7 +156,7 @@ def main(
                 chains.append(parsed_response)
 
                 messages = chat_my(messages, 'Evaluation Result: ' + evaluation_result,
-                                   temp=temperature, stop="Evaluation Result:", visualize=if_visualize, max_tokens=512)
+                                   temp=TEMPERATURE, stop="Evaluation Result:", visualize=if_visualize, max_tokens=512)
                 temp = messages[-1]['content']
                 print("DEBUG USER QUERY OF SESSION " + str(session_id) + ", TURN " + str(n_turn) + ", PARSING ACTION AND INPUT: \n" + messages[-2]['content'] + "\n\n\n\n", flush=True)
                 print("DEBUG RESPONSE OF SESSION " + str(session_id) + ", TURN " + str(n_turn) + ", PARSING ACTION AND INPUT: \n" + temp, flush=True)
@@ -169,7 +169,7 @@ def main(
             first_item['chains'] = chains
 
             print("DEBUG: Running reflection to determine success for the first query.", flush=True)
-            messages = chat_my(messages, prompt_reflection, temp=temperature, stop="Evaluation Result:", visualize=if_visualize, max_tokens=512)
+            messages = chat_my(messages, prompt_reflection, temp=TEMPERATURE, stop="Evaluation Result:", visualize=if_visualize, max_tokens=512)
             res = messages[-1]['content']
             print("DEBUG USER QUERY REFLECTION OF SESSION " + str(session_id) + ": \n" + prompt_reflection + "\n\n\n\n", flush=True)
             print("DEBUG RESPONSE OF SESSION " + str(session_id) + ": \n" + res, flush=True)
@@ -210,7 +210,7 @@ def main(
 
                 print("DEBUG: Generating follow-up query using chat_my.", flush=True)
                 response = chat_my(messages, template_q_follow_added_question,
-                                   temp=temperature, stop="Thought:", visualize=if_visualize, max_tokens=512)[-1]['content']
+                                   temp=TEMPERATURE, stop="Thought:", visualize=if_visualize, max_tokens=512)[-1]['content']
                 messages = messages + [
                     {"role": "user", "content": template_q_follow_added_question},
                     {"role": "assistant", "content": response}
@@ -225,8 +225,11 @@ def main(
                 chains = []
                 print("DEBUG: Processing chain of calls for the short-term memory slot query.", flush=True)
                 messages = chat_my(messages, template_a_follow,
-                                   temp=temperature, stop="Evaluation Result:", visualize=if_visualize, max_tokens=512)
+                                   temp=TEMPERATURE, stop="Evaluation Result:", visualize=if_visualize, max_tokens=512)
                 temp = messages[-1]['content']
+                print("DEBUG template_a_follow OF SESSION " + str(session_id) + ", STM TURN " + str(n_stm) + ": \n" + template_a_follow + "\n\n\n\n", flush=True)
+                print("DEBUG RESPONSE OF SESSION " + str(session_id) + ", STM TURN " + str(n_stm) + ": \n" + temp, flush=True)
+                print("DEBUG END: --------------------------------------------------------------------------------------------------------------\n\n\n\n\n\n\n\n", flush=True)
                 parsed_response = parse_response(temp, API_name_list, API_descriptions)
                 for n_turn in range(max_turn):
                     if not parsed_response['parse_successful']:
@@ -243,7 +246,7 @@ def main(
                     chains.append(parsed_response)
 
                     messages = chat_my(messages, 'Evaluation Result: ' + evaluation_result,
-                                       temp=temperature, stop="Evaluation Result:", visualize=if_visualize, max_tokens=512)
+                                       temp=TEMPERATURE, stop="Evaluation Result:", visualize=if_visualize, max_tokens=512)
                     temp = messages[-1]['content']
                     print("DEBUG USER QUERY OF SESSION " + str(session_id) + ", TURN " + str(n_turn) + ", PARSING ACTION AND INPUT: \n" + messages[-2]['content'] + "\n\n\n\n", flush=True)
                     print("DEBUG RESPONSE OF SESSION " + str(session_id) + ", TURN " + str(n_turn) + ", PARSING ACTION AND INPUT: \n" + temp, flush=True)
@@ -256,7 +259,7 @@ def main(
 
                 print("DEBUG: Running reflection to determine success for the short-term memory slot query.", flush=True)
                 messages = chat_my(messages, prompt_reflection,
-                                   temp=temperature, stop="Evaluation Result:", visualize=if_visualize, max_tokens=512)
+                                   temp=TEMPERATURE, stop="Evaluation Result:", visualize=if_visualize, max_tokens=512)
                 res = messages[-1]['content']
                 print("DEBUG USER QUERY REFLECTION OF SESSION " + str(session_id) + ", TURN " + str(n_turn) + ": \n" + messages[-2]['content'] + "\n\n\n\n", flush=True)
                 print("DEBUG RESPONSE OF SESSION " + str(session_id) + ", TURN " + str(n_turn) + ": \n" + res, flush=True)
@@ -370,43 +373,128 @@ def normalize_evaluation_args(metric_name, args, API_descriptions):
 def run_evaluation(metric_name, args, API_list, API_descriptions, truncate=False):
     """
     Execute an evaluation metric from Hugging Face evaluate.
+    For the custom metric 'llm_judge', use the LLM to judge text quality.
     """
     global METRIC_CACHE
     if metric_name not in API_list:
         raise ValueError(f"Metric '{metric_name}' is not supported. Supported metrics are: {API_list}")
+    
+    # First, normalize the arguments.
     try:
-        # Normalize the input arguments using the metadata.
         print(f"DEBUG: Normalizing evaluation arguments for metric '{metric_name}'", flush=True)
         print(f"DEBUG: Arguments before normalization: {args}", flush=True)
         normalized_args = normalize_evaluation_args(metric_name, args, API_descriptions)
-        print("DEBUG: EVALUATIONEVALUATIONEVALUATIONEVALUATION: NORMALIZED ARGS = " + str(normalized_args), flush=True)
-        
-        # Use the cache to load the metric only once.
+        print("DEBUG: NORMALIZED ARGS = " + str(normalized_args), flush=True)
+    except Exception as e:
+        return f"Normalization error: {str(e)}"
+    
+    # If the metric is our custom llm_judge, handle it separately.
+    if metric_name == "llm_judge":
+        return run_llm_judge_evaluation(normalized_args, API_descriptions)
+    
+    # For all other metrics, use the standard evaluate.load mechanism.
+    try:
         if metric_name not in METRIC_CACHE:
             METRIC_CACHE[metric_name] = evaluate.load(metric_name)
         metric = METRIC_CACHE[metric_name]
         
-        # Special cases for specific metrics.
+        # Special cases: adjust parameters if needed.
         if metric_name == "bertscore":
             print("DEBUG: Overriding model_type for bertscore to 'google/bert_uncased_L-2_H-128_A-2'", flush=True)
             normalized_args["model_type"] = "google/bert_uncased_L-2_H-128_A-2"
         if metric_name == "perplexity":
-            print("DEBUG: Overriding model_id for perplexity to 'gpt-2'", flush=True) 
+            print("DEBUG: Overriding model_id for perplexity to 'gpt-2'", flush=True)
             normalized_args["model_id"] = "gpt2"
         
         result = metric.compute(**normalized_args)
-        print("DEBUG: EVALUATIONEVALUATIONEVALUATIONEVALUATION RESULT = " + str(result), flush=True)
         result_str = json.dumps(result)
-        print("DEBUG: EVALUATIONEVALUATIONEVALUATIONEVALUATION RESULT JSONED = " + str(result_str), flush=True)
         if truncate:
             result_str = result_str[:truncate]
-        # # Optionally free up GPU memory. From instantiations of the loop before
-        # if torch.cuda.is_available():
-        #     torch.cuda.empty_cache()
         return result_str
     except Exception as e:
-        print("DEBUG ERROR IN EVALUATIONEVALUATIONEVALUATIONEVALUATION: " + str(e), flush=True)
+        print("DEBUG ERROR: " + str(e), flush=True)
         return f"The Action or Action Input is incorrect: {str(e)}. Fix it and provide new Action or Action input."
+
+def run_llm_judge_evaluation(normalized_args, API_descriptions, temp=TEMPERATURE, max_tokens=512):
+    """
+    Custom handler for the 'llm_judge' metric. This function constructs a prompt
+    to use the LLM as a judge for evaluating a candidate text based on multiple quality criteria.
+    
+    Expected keys in normalized_args for llm_judge:
+      - candidate_texts (LIST of STRING): The text to evaluate.
+      - quality_criteria (LIST of STRING): Aspects to consider (e.g., coherence, creativity).
+      - scale_max (NUMBER): The top of the evaluation scale.
+      - explanation_required (BOOLEAN, optional): Whether to output an explanation.
+      - evaluation_type (STRING, optional): e.g., 'numeric' (default) or others.
+      - prompt_template (STRING, optional): A custom prompt snippet to guide evaluation.
+    
+    Returns:
+        JSON string containing the evaluation result (e.g., {"score": 8, "explanation": "..."})
+    """
+    # Ensure JSON-safe formatting for normalized_args
+    json_args = json.dumps(normalized_args, ensure_ascii=False, indent=2)
+    # Prepare a basic system message.
+    messages = [{"role": "system", "content": "You are an LLM acting as an evaluation function with this documentation: " + json.dumps(API_descriptions["llm_judge"], ensure_ascii=False)}]
+    # Extract required parameters.
+    # candidate_texts = normalized_args.get("candidate_texts", "")
+    # quality_criteria = normalized_args.get("quality_criteria", [])
+    # scale_max = normalized_args.get("scale_max", 10)
+    
+    # # Optional parameters.
+    # #reference_texts = normalized_args.get("reference_texts", [])
+    # explanation_required = normalized_args.get("explanation_required", False)
+    # evaluation_type = normalized_args.get("evaluation_type", "numeric")
+    # custom_prompt_template = normalized_args.get("prompt_template", "")
+    # #language = normalized_args.get("language", "en")
+    
+    # # Build the custom prompt.
+    # prompt = (
+    #     f"You are an expert judge. Evaluate the quality of the following candidate text on a scale from 0 to {scale_max}.\n"
+    #     f"Quality criteria to consider: {', '.join(quality_criteria)}.\n"
+    # )
+    # if reference_texts:
+    #     prompt += f"Reference texts (for comparison): {', '.join(reference_texts)}.\n"
+    
+    # if explanation_required:
+    #     prompt += "Provide a brief explanation for your evaluation.\n"
+    # if custom_prompt_template:
+    #     prompt += f"Additional instructions: {custom_prompt_template}\n"
+    # prompt += f"Candidate text: {candidate_texts}\n"
+    # Construct the prompt properly
+    prompt = (
+        f"Your input parameters:\n```json\n{json_args}\n```\n\n"
+        "You are now acting as an evaluation judge. You need to assess the provided texts based on the specified quality criteria and return a structured evaluation.\n"
+        "Your response must **ONLY** contain a JSON object structured as follows:\n\n"
+        "```json\n"
+        "{\n"
+        '  "scores": {\n'
+        '    "coherence": [score1, score2, ..., scoreN],\n'
+        '    "creativity": [score1, score2, ..., scoreN],\n'
+        '    "relevance": [score1, score2, ..., scoreN]\n'
+        "  },\n"
+        '  "explanation": "textual explanation here"  # (only if requested)\n'
+        "}\n"
+        "```\n\n"
+        "**Important:**\n"
+        "- Do NOT include any additional text, commentary, or explanations outside of this JSON structure.\n"
+        "- At the very end of your response, add exactly the text `'Evaluation Ends'` to signal completion.\n"
+    )
+    
+    # Use your chat_my function to get the evaluation from the LLM.
+    try:
+        #print("Prompt:", prompt, flush=True)
+        response = chat_my(messages, prompt, temp=temp, stop="Evaluation Ends", visualize=False, max_tokens=max_tokens)[-1]['content']
+        #print("Response from chat_my:", response, flush=True)
+        # Attempt to parse the response as JSON.
+        # result = json.loads(response)
+        # return json.dumps(result)
+        return response
+    except Exception as e:
+        # If parsing fails, return an error message.
+        return json.dumps({
+            "error": f"Failed to process llm_judge response: {str(e)}",
+            "raw_response": response if 'response' in locals() else ""
+        })
 
 def save_intermediate_results(API, session_id, all_sessions, subfolder_path):
     """

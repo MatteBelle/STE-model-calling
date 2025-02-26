@@ -25,6 +25,7 @@ def get_chat_completion_my(messages, max_tokens=512, temp=0.4, return_raw=False,
     # print("DEBUG: Formatted prompt with assistant header:", full_prompt)
     # print("MESSAGES: ", str(messages))
     # print("MESSAGES TYPE: ", type(messages))
+    print("DENTRO CHAT COMPLETION MY", flush = True)
     server_url = os.environ.get("MODEL_SERVER_URL", "http://localhost:8000/generate")
     payload = {
         #"prompt": full_prompt,
@@ -75,7 +76,7 @@ def get_chat_completion_my(messages, max_tokens=512, temp=0.4, return_raw=False,
     
     # Remove any stray tokens (for instance, <|endofresponse|>) ----> FAKE: IN SERVER I ALREADY USE skip_special_tokens=True
     #response_text = response_text.replace("<|endofresponse|>", "").strip()
-    
+    print("ESCO CHAT COMPLETION MY", flush = True)
     return response_text if not return_raw else {"response": response_text}
 
 def format_messages(messages):
@@ -115,13 +116,16 @@ def visualize_messages(messages):
             #print("GENERATED RESPONSE ENDS: ----------------------")
 
 def chat_my(messages, new_message, visualize=True, **params):
+    print("DENTRO CHAT MY", flush = True)
     # print("NEW MESSAGE: ", new_message)
     # print("NEW MESSAGE TYPE: ", type(new_message))
     messages = deepcopy(messages)
-    messages.append({"role": "user", "content": json.dumps(str(new_message) + "<|promptends|>")})
+    messages.append({"role": "user", "content": new_message + "<|promptends|>"})
+    print("DENTRO CHAT MY JSONED new_message is ", new_message + "<|promptends|>", flush=True)
     #print("MESSAGE: ", str(messages[-1]['content']))
     # Call get_chat_completion_my without passing model
     response = get_chat_completion_my(messages, **params)
+    print("DENTRO CHAT MY response is ", response)
     messages[-1]["content"] = messages[-1]["content"].replace("<|promptends|>", "").strip()
     # clean the output of extra remaining of the chat template (llama-3-8b)
     response = response.replace('"assistant\n\n', "")
@@ -130,4 +134,5 @@ def chat_my(messages, new_message, visualize=True, **params):
     #print("DEBUG CHAT MY, RESPONSE: " + response)
     if visualize:
         visualize_messages(messages[-2:])
+    print("ESCO DA CHAT MY", flush = True)
     return messages
