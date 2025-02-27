@@ -5,11 +5,6 @@ import random
 import os
 import re
 
-# def clean_response(response):
-# # Remove lines that start with “user:”, “assistant:”, or “system:”
-#     return re.sub(r’^(user|assistant|system)\s*’, ‘’, response, flags=re.IGNORECASE | re.MULTILINE)
-# response = clean_response(response)
-
 def find_reverse(str_a, ch):
     assert type(str_a) == type(ch) == str
     for i in range(len(str_a) - 1, -1, -1):
@@ -34,20 +29,14 @@ def strip_end(a, b):
 def parse_response(response, API_name_list, api_descriptions,
                    proc_thought=False, proc_toolken=False, check_API_name=True, ground_API=False):
     item = dict()
-    # (Optionally include API metadata only once if needed)
-    # item['API_name_list'] = API_name_list
-    # item['api_descriptions'] = api_descriptions
-
     item['parse_successful'] = True
     item['actions'] = []
-
     # Clean up special tokens and common role labels.
     for token in ["<|begin_of_text|>", "<|start_header_id|>", "<|end_header_id|>", "<|eot_id|>"]:
         response = response.replace(token, "")
     for role in ["system", "user", "assistant"]:
         response = response.replace(role, "")
     response = response.strip()
-
     # Check for final answer; if found and no actions precede, mark finish.
     if "Final Answer:" in response:
         parts = response.split("Final Answer:")
@@ -63,11 +52,9 @@ def parse_response(response, API_name_list, api_descriptions,
         item['finish'] = True
     else:
         item['finish'] = False
-
     # Remove the Final Answer part from further processing.
     if "Final Answer:" in response:
         response = response.split("Final Answer:")[0]
-
     # Now extract all occurrences of Action and corresponding Action Input.
     # We split by "Action:" and ignore the part before the first occurrence.
     raw_actions = response.split("Action:")[1:]
@@ -92,7 +79,7 @@ def parse_response(response, API_name_list, api_descriptions,
                 action = get_close_matches(action, API_name_list, n=1, cutoff=0.001)[0]
             else:
                 item['parse_successful'] = False
-                item['parse_error_msg'] = ("Please only use exactly one of the following APIs: {}."
+                item['parse_error_msg'] = ("Please only use exactly the following APIs: {}."
                                            .format(", ".join(API_name_list)))
                 return item
 
@@ -106,13 +93,13 @@ def parse_response(response, API_name_list, api_descriptions,
         right_index = candidate.rfind("}")
         if left_index == -1 or right_index == -1 or right_index <= left_index:
             item['parse_successful'] = False
-            item['parse_error_msg'] = ("The Action Input is not in valid JSON format. It should begin with '{' and end with '}'.")
+            item['parse_error_msg'] = ("One Action Input is not in valid JSON format. It should begin with '{' and end with '}'.")
             return item
         json_str = candidate[left_index:right_index+1]
         # Check for extra braces.
         if json_str.startswith("{{") or json_str.endswith("}}"):
             item['parse_successful'] = False
-            item['parse_error_msg'] = ("The Action Input should begin with a single '{' and end with a single '}'.")
+            item['parse_error_msg'] = ("One Action Input should begin with a single '{' and end with a single '}'.")
             return item
         try:
             action_input_obj = json.loads(json_str)
@@ -182,6 +169,7 @@ def get_metric_subgroup(metric_name: str = None, json_path: str = "STE/tool_meta
         "metrics": chosen_subgroup["metrics"]
     }
     
+
 def get_parameters_optionality(metrics):
     """
     For each metric in 'metrics', assign a boolean flag 
@@ -194,6 +182,7 @@ def get_parameters_optionality(metrics):
     for metric in metrics:
         optional_flags[metric] = (random.random() < 0.6)
     return optional_flags
+
 
 def get_random_metric_subgroup_with_flags(
     metric_name: str = None, 
@@ -214,6 +203,7 @@ def get_random_metric_subgroup_with_flags(
         "optional_flags": optional_flags
     }
 
+
 def build_optional_parameters_text(API_name_list, optional_flags, API_descriptions):
     """
     Create a guidance text describing whether (True) or not (False)
@@ -225,19 +215,15 @@ def build_optional_parameters_text(API_name_list, optional_flags, API_descriptio
     for metric in API_name_list:
         # If the metric is missing from optional_flags, skip or default to False
         flag = optional_flags.get(metric, False)
-        
         # Get the optional parameters from API_descriptions
         metric_info = API_descriptions.get(metric, {})
         optional_params = metric_info.get("optional_parameters", [])
-
         # If no optional parameters exist, skip the instruction
         if not optional_params:
             lines.append(f"- For {metric}: (No optional parameters available)")
             continue
-
         # Build a readable list of optional param names
         param_names = [p["name"] for p in optional_params]
-
         if flag:
             lines.append(
                 f"- For {metric}: You MUST include these optional parameters in your user query: {', '.join(param_names)}."
@@ -246,11 +232,11 @@ def build_optional_parameters_text(API_name_list, optional_flags, API_descriptio
             lines.append(
                 f"- For {metric}: Do NOT include any optional parameters in your user query."
             )
-    
-    lines.append("In case optional parameters arae asked to be included, the query must explicitly specify both the parameters and a chosen value.")
-
+            
+    lines.append("In case optional parameters ara asked to be included, the query must explicitly specify both the parameters and a chosen value.")
     # Join everything into a single text block
     return "\n".join(lines)
+
 
 def delete_intermediate_subfolder(subfolder_path):
     """
@@ -272,6 +258,7 @@ def delete_intermediate_subfolder(subfolder_path):
             print(f"DEBUG: Subfolder does not exist: {subfolder_path}")
     except Exception as e:
         print(f"DEBUG: Error deleting intermediate subfolder: {e}")
+
 
 def trim_ltm_stm(ltm_list, placeholder="[...]", max_length=2000, list_trim_threshold=40):
     """

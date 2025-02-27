@@ -17,33 +17,28 @@ METRIC_CACHE = {}
 TEMPERATURE = 0.4
 
 def main(
-    num_episodes: int = 5,
-    num_stm_slots: int = 3,
-    max_turn: int = 4,
+    num_sessions: int = 5,
+    num_stm_slots: int = 2,
+    max_turn: int = 3,
     intermediate_dir_write: str = "STE/results/intermediate_results/",
     final_dir_write: str = "STE/results/final_results/",
     if_visualize: bool = True,
 ):
     placeholder = "[...]"  # used for trimmed LTM lists
     data_dict = dict()
-    print("DEBUG: Ensuring output directories exists.", flush = True)
 
     os.makedirs(final_dir_write, exist_ok=True)
     os.makedirs(intermediate_dir_write, exist_ok=True)
-    # Create a unique subfolder inside intermediate_dir_write
     run_timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     subfolder_path = os.path.join(intermediate_dir_write, f"run_{run_timestamp}")
-    # Ensure the subfolder exists inside intermediate_dir_write
     os.makedirs(subfolder_path, exist_ok=True)
-    # Save the subfolder name for later use (optional)
     subfolder_info_path = os.path.join(intermediate_dir_write, "latest_run_subfolder.txt")
     with open(subfolder_info_path, "w") as f:
         f.write(subfolder_path)
+        
     print(f"DEBUG: Intermediate results will be stored in: {subfolder_path}", flush = True)
-
-    # ----------------------------------------------
     print("DEBUG: Entering main function with parameters:", flush=True)
-    print(f"num_episodes={num_episodes}, num_stm_slots={num_stm_slots}, max_turn={max_turn}, final_dir_write={final_dir_write}, if_visualize={if_visualize}", flush=True)
+    print(f"num_sessions={num_sessions}, num_stm_slots={num_stm_slots}, max_turn={max_turn}, final_dir_write={final_dir_write}, if_visualize={if_visualize}", flush=True)
     # ... [setup and directory creation as before]
 
     # Load API descriptions and API list.
@@ -62,8 +57,6 @@ def main(
     print("DEBUG: Starting iteration over API_list.", flush=True)
     for API in API_list:
         print("DEBUG: Processing API:", API, flush=True)
-        #API_name_list = [API] + (API_list[3:4] if len(API_list) > 3 else [])
-
         with open("STE/prompts/prompt_explore.txt", "r") as f:
             prompt_template = f.read().strip()
 
@@ -71,7 +64,7 @@ def main(
         template_q, template_a, template_q_follow, template_a_follow = template_q.strip(), template_a.strip(), template_q_follow.strip(), template_a_follow.strip()
         #template_q_follow = template_q_follow.format(placeholder=placeholder) commented as it's later formatted with optionality as well.
         all_sessions, explored_queries, whether_successful = [], [], []
-        for session_id in range(num_episodes):
+        for session_id in range(num_sessions):
             print("DEBUG: Starting episode:", session_id, flush = True)    
             # Extract subgroups that includes (API) and parameters optionality    
             subgroup = get_metric_subgroup(API)
@@ -181,7 +174,6 @@ def main(
                 successful = "Yes"
 
             whether_successful.append(successful)
-
             item_list.append(first_item)
 
             # Process additional STM slots similarly.
@@ -288,15 +280,43 @@ def main(
     print("DEBUG: Finished main function.", flush=True)
 
 
-def LTM(X, labels):
-    #assert len(X) == len(labels)
+# def LTM(X, labels):
+#     #assert len(X) == len(labels)
+#     try:
+#         assert len(X) == len(labels)
+#     except AssertionError:
+#         print(f"DEBUG: Assertion failed! len(X, flush=True) == len(labels) '. len(X) {len(X)}, len(labels) {len(labels)}")
+#         raise  # Re-raise the exception after logging
+#     print("DEBUG: LTMLTM: " + str(["Query: {} \n Solved: {}".format(X[i], labels[i], flush=True) for i in range(len(X))]))
+#     return ["Query: {} \n Solved: {}".format(X[i], labels[i]) for i in range(len(X))]
+
+def LTM(X, labels, max_items=10):
+    """
+    Creates a formatted list of past queries and their success status.
+    If the list exceeds max_items, it will keep the most recent ones.
+    
+    Args:
+        X: List of queries
+        labels: List of success labels
+        max_items: Maximum number of items to include
+    
+    Returns:
+        List of formatted strings
+    """
     try:
         assert len(X) == len(labels)
     except AssertionError:
-        print(f"DEBUG: Assertion failed! len(X, flush=True) == len(labels) '. len(X) {len(X)}, len(labels) {len(labels)}")
-        raise  # Re-raise the exception after logging
-    print("DEBUG: LTMLTM: " + str(["Query: {} \n Solved: {}".format(X[i], labels[i], flush=True) for i in range(len(X))]))
-    return ["Query: {} \n Solved: {}".format(X[i], labels[i]) for i in range(len(X))]
+        print(f"DEBUG: Assertion failed! len(X) == len(labels) '. len(X) {len(X)}, len(labels) {len(labels)}")
+        raise
+    
+    # If the list is too long, keep only the most recent items
+    if len(X) > max_items:
+        X = X[-max_items:]
+        labels = labels[-max_items:]
+    
+    formatted_list = ["Query: {} \n Solved: {}".format(X[i], labels[i]) for i in range(len(X))]
+    print("DEBUG: LTMLTM: " + str(formatted_list))
+    return formatted_list
 
 def normalize_evaluation_args(metric_name, args, API_descriptions):
     """
@@ -435,32 +455,7 @@ def run_llm_judge_evaluation(normalized_args, API_descriptions, temp=TEMPERATURE
     json_args = json.dumps(normalized_args, ensure_ascii=False, indent=2)
     # Prepare a basic system message.
     messages = [{"role": "system", "content": "You are an LLM acting as an evaluation function with this documentation: " + json.dumps(API_descriptions["llm_judge"], ensure_ascii=False)}]
-    # Extract required parameters.
-    # candidate_texts = normalized_args.get("candidate_texts", "")
-    # quality_criteria = normalized_args.get("quality_criteria", [])
-    # scale_max = normalized_args.get("scale_max", 10)
     
-    # # Optional parameters.
-    # #reference_texts = normalized_args.get("reference_texts", [])
-    # explanation_required = normalized_args.get("explanation_required", False)
-    # evaluation_type = normalized_args.get("evaluation_type", "numeric")
-    # custom_prompt_template = normalized_args.get("prompt_template", "")
-    # #language = normalized_args.get("language", "en")
-    
-    # # Build the custom prompt.
-    # prompt = (
-    #     f"You are an expert judge. Evaluate the quality of the following candidate text on a scale from 0 to {scale_max}.\n"
-    #     f"Quality criteria to consider: {', '.join(quality_criteria)}.\n"
-    # )
-    # if reference_texts:
-    #     prompt += f"Reference texts (for comparison): {', '.join(reference_texts)}.\n"
-    
-    # if explanation_required:
-    #     prompt += "Provide a brief explanation for your evaluation.\n"
-    # if custom_prompt_template:
-    #     prompt += f"Additional instructions: {custom_prompt_template}\n"
-    # prompt += f"Candidate text: {candidate_texts}\n"
-    # Construct the prompt properly
     prompt = (
         f"Your input parameters:\n```json\n{json_args}\n```\n\n"
         "You are now acting as an evaluation judge. You need to assess the provided texts based on the specified quality criteria and return a structured evaluation.\n"
@@ -468,26 +463,20 @@ def run_llm_judge_evaluation(normalized_args, API_descriptions, temp=TEMPERATURE
         "```json\n"
         "{\n"
         '  "scores": {\n'
-        '    "coherence": [score1, score2, ..., scoreN],\n'
-        '    "creativity": [score1, score2, ..., scoreN],\n'
-        '    "relevance": [score1, score2, ..., scoreN]\n'
+        '    "chosenmetric1": [score1, score2, ..., scoreN],\n'
+        '    "...": [score1, score2, ..., scoreN],\n'
+        '    "chosenmetricLast": [score1, score2, ..., scoreN]\n'
         "  },\n"
-        '  "explanation": "textual explanation here"  # (only if requested)\n'
+        '  "scale_max": <scale max value>,\n'
+        '  "explanation": "<textual explanation here>"  # (only if requested)\n'
         "}\n"
         "```\n\n"
         "**Important:**\n"
         "- Do NOT include any additional text, commentary, or explanations outside of this JSON structure.\n"
         "- At the very end of your response, add exactly the text `'Evaluation Ends'` to signal completion.\n"
     )
-    
-    # Use your chat_my function to get the evaluation from the LLM.
     try:
-        #print("Prompt:", prompt, flush=True)
         response = chat_my(messages, prompt, temp=temp, stop="Evaluation Ends", visualize=False, max_tokens=max_tokens)[-1]['content']
-        #print("Response from chat_my:", response, flush=True)
-        # Attempt to parse the response as JSON.
-        # result = json.loads(response)
-        # return json.dumps(result)
         return response
     except Exception as e:
         # If parsing fails, return an error message.

@@ -1,6 +1,6 @@
 [  
-  "llm_judge",  
   "bertscore",
+  "llm_judge",  
   "accuracy",
   "exact_match",
   "recall",

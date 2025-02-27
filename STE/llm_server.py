@@ -10,10 +10,6 @@ HF_HOME = "/huggingface_cache"
 os.environ["HF_HOME"] = HF_HOME
 os.makedirs(HF_HOME, exist_ok=True)
 
-# device = torch.device("cuda:0")
-# # Set PyTorch to use only 90% of the GPU memory
-# torch.cuda.set_per_process_memory_fraction(0.9, device=device)
-
 #MODEL_NAME = "meta-llama/Meta-Llama-3-8B-Instruct"
 MODEL_NAME = "meta-llama/Llama-3.1-8B-Instruct"
 print("DEBUGs (Server): Initializing tokenizer from MODEL_NAME.", flush=True)
@@ -56,20 +52,20 @@ async def generate_text(request: InferenceRequest):
             tokenizer.apply_chat_template(request.prompt, tokenize=False),
             return_tensors="pt",
             truncation=True,
-            max_length=20000
+            max_length=8192
             ).to("cuda")
         token_ids = inputs.input_ids[0].tolist()
         print("DEBUG (Server): Prompt length (tokens):", len(token_ids), flush=True)
         print("GENERANDO RISPOSTA GENERATEEEE------------------------------------------------------------------------------", flush=True)
         # Generate output using the provided parameters
-        #with torch.no_grad():
-        output_tokens = model.generate(
-            **inputs,
-            max_length=inputs.input_ids.shape[1] + request.max_tokens,
-            temperature=request.temperature,
-            do_sample=True,
-            #pad_token_id=tokenizer.pad_token_id,
-        )
+        with torch.no_grad():
+            output_tokens = model.generate(
+                **inputs,
+                max_length=inputs.input_ids.shape[1] + request.max_tokens,
+                temperature=request.temperature,
+                do_sample=True,
+                #pad_token_id=tokenizer.pad_token_id,
+            )
         # Decode the full generated output
         generated_text = tokenizer.decode(output_tokens[0], skip_special_tokens=True)
         del inputs, output_tokens

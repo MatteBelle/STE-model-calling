@@ -28,11 +28,39 @@
     "metrics": ["perplexity", "llm_judge"]
   },
   "8": {
-    "name": "judge",
+    "name": "llm_judge",
     "metrics": ["llm_judge"]
   },
   "9": {
-    "name": "super_generation",
-    "metrics": ["rouge", "bertscore", "llm_judge"]
+    "name": "rouge",
+    "metrics": ["rouge"]
+  },
+  "10": {
+    "name": "bleu",
+    "metrics": ["bleu"]
+  },
+  "11": {
+    "name": "bertscore",
+    "metrics": ["bertscore"]
+  },
+  "12": {
+    "name": "exact_match",
+    "metrics": ["exact_match"]
+  },
+  "13": {
+    "name": "recall",
+    "metrics": ["recall"]
+  },
+  "14": {
+    "name": "f1",
+    "metrics": ["f1"]
+  },
+  "15": {
+    "name": "accuracy",
+    "metrics": ["accuracy"]
+  },
+  "16": {
+    "name": "perplexity",
+    "metrics": ["perplexity"]
   }
 }
