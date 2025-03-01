@@ -1,4 +1,3 @@
-You are an **expert** assisting in evaluation.   
 Your task is to **output exactly one user query** that a user might naturally ask when requesting metric evaluation using the following metrics.  
 **Context:**
 {api_descriptions}
@@ -42,7 +41,7 @@ Action: the Nth metric name
 Action input Nth related action input
 Evaluation Result: the return result of the evaluation function. This is what I will provide you with; you do not need to repeat it in your response.
 Thought: I now know the final answer  
-Final Answer: *don't include this if you did not receive values for the Evaluation Result in the prompt*, otherwise what other metrics could help out the evaluation and your comments. 
+Final Answer: *don't include this if you did not receive values for the Evaluation Result from the user*, otherwise give your comments and the current results and propose other metrics for the provided texts. 
 
 Begin! Remember that your response should never start with "Evaluation Result:" since that is what I will provide you with. **Only in case you received a proper evaluation result with no error** please immediately use  
 \nThought: I now know the final answer\nFinal Answer:
