@@ -17,7 +17,7 @@ METRIC_CACHE = {}
 TEMPERATURE = 0.4
 
 def main(
-    num_sessions: int = 5,
+    num_sessions: int = 4,
     num_stm_slots: int = 2,
     max_turn: int = 3,
     intermediate_dir_write: str = "STE/results/intermediate_results/",
@@ -170,8 +170,10 @@ def main(
             
             if "No" in res:
                 successful = "No"
+                first_item["solved_at_turn"] = -1  # Set to -1 if never solved
             else:
                 successful = "Yes"
+                first_item['solved_at_turn'] = n_turn + 1  # Turn count starts at 1
 
             whether_successful.append(successful)
             item_list.append(first_item)
@@ -258,8 +260,10 @@ def main(
                 print("DEBUG END: --------------------------------------------------------------------------------------------------------------\n\n\n\n\n\n\n\n", flush=True)
                 if "No" in res:
                     successful = "No"
+                    item['solved_at_turn'] = -1
                 else:
                     successful = "Yes"
+                    item['solved_at_turn'] = n_turn + 1  # Turn count starts at 1
                 whether_successful.append(successful)
                 item_list.append(item)
 
@@ -458,22 +462,22 @@ def run_llm_judge_evaluation(normalized_args, API_descriptions, temp=TEMPERATURE
     
     prompt = (
         f"Your input parameters:\n```json\n{json_args}\n```\n\n"
-        "You are now acting as an evaluation judge. You need to assess the provided texts based on the specified quality criteria and return a structured evaluation.\n"
-        "Your response must **ONLY** contain a JSON object structured as follows:\n\n"
+        "You are an LLM Judge evaluating text quality.\n"
+        "**Your ONLY task** is to output a JSON response formatted like this:\n\n"
         "```json\n"
         "{\n"
         '  "scores": {\n'
-        '    "chosenmetric1": [score1, score2, ..., scoreN],\n'
-        '    "...": [score1, score2, ..., scoreN],\n'
-        '    "chosenmetricLast": [score1, score2, ..., scoreN]\n'
+        '    "metric1": [score1, score2, ..., scoreN],\n'
+        '    "metric...": [score1, score2, ..., scoreN],\n'
+        '    "metricJ": [score1, score2, ..., scoreN]\n'
         "  },\n"
-        '  "scale_max": <scale max value>,\n'
-        '  "explanation": "<textual explanation here>"  # (only if requested)\n'
+        '  "scale_max": <integer>, # scale_max\n'
+        '  "explanation": "<text>"  # Only if explanation_required=true\n'
         "}\n"
-        "```\n\n"
-        "**Important:**\n"
-        "- Do NOT include any additional text, commentary, or explanations outside of this JSON structure.\n"
-        "- At the very end of your response, add exactly the text `'Evaluation Ends'` to signal completion.\n"
+        "```\n"
+        "**STRICT INSTRUCTIONS:**\n"
+        "- Respond ONLY with a JSON object.\n"
+        "- Do NOT include any extra text before or after the JSON, except for exactly the text `'Evaluation Ends' right after the json.\n"
     )
     try:
         response = chat_my(messages, prompt, temp=temp, stop="Evaluation Ends", visualize=False, max_tokens=max_tokens)[-1]['content']

@@ -384,7 +384,7 @@
             {
                 "name": "quality_criteria",
                 "type": "LIST of STRING",
-                "description": "A list of aspects to evaluate (e.g., coherence, creativity, relevance, fluency).",
+                "description": "A list of aspects to evaluate (coherence, creativity, relevance, fluency).",
                 "default": ""
             },
             {
