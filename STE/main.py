@@ -17,7 +17,7 @@ METRIC_CACHE = {}
 TEMPERATURE = 0.4
 
 def main(
-    num_sessions: int = 4,
+    num_sessions: int = 2,
     num_stm_slots: int = 2,
     max_turn: int = 3,
     intermediate_dir_write: str = "STE/results/intermediate_results/",
@@ -51,7 +51,7 @@ def main(
 
     # Memory and reflection prompts remain unchanged.
     PAST_Q_MSG_pre = "Below are queries you have already explored and whether you successfully solved them with the API's help:"
-    PAST_Q_MSG_post = f"Based on these, try to explore queries that can help you understand the API further; avoid synthesizing queries that are too close to the existing ones and remember that {placeholder} is a placeholder I use for trimmed texts, so don't use {placeholder} it in your queries. Try different ways to formulate the query (use synonyms, vary its structure, vary the length of the question, change the references parameters etc.)."
+    PAST_Q_MSG_post = f"Based on these, try to explore a new query that can help you understand the API further; avoid synthesizing a query that is too close to the existing ones and remember that {placeholder} is a placeholder I use for trimmed texts, so don't use {placeholder} in your query. Try different ways to formulate it (use synonyms, vary its structure, vary the length of the question, change the references parameters etc.)."
     prompt_reflection = "Do you think you successfully fulfilled this query in the end? Respond with \"Yes\" or \"No\"."
 
     print("DEBUG: Starting iteration over API_list.", flush=True)
