@@ -70,7 +70,7 @@ def chat_my(messages, new_message, visualize=True, **params):
     # print("NEW MESSAGE TYPE: ", type(new_message))
     messages = deepcopy(messages)
     messages.append({"role": "user", "content": new_message + "<|promptends|>"})
-    print("INSIDE CHAT MY JSONED new_message is ", new_message + "<|promptends|>", flush=True)
+    print("INSIDE CHAT MY JSONED new_message is ", new_message, flush=True)
     #print("MESSAGE: ", str(messages[-1]['content']))
     # Call get_chat_completion_my without passing model
     response = get_chat_completion_my(messages, **params)
