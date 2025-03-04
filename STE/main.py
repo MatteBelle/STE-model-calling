@@ -14,10 +14,10 @@ import evaluate
 import random
 
 METRIC_CACHE = {}
-TEMPERATURE = 0.4
+TEMPERATURE = 0.7
 
 def main(
-    num_sessions: int = 2,
+    num_sessions: int = 30,
     num_stm_slots: int = 2,
     max_turn: int = 3,
     intermediate_dir_write: str = "STE/results/intermediate_results/",
@@ -26,6 +26,14 @@ def main(
 ):
     placeholder = "[...]"  # used for trimmed LTM lists
     data_dict = dict()
+    hyperparameters = {
+        "Temperature": TEMPERATURE,
+        "num_sessions": num_sessions,
+        "num_stm_slots": num_stm_slots,
+        "max_turn": max_turn,
+        "placeholder": placeholder,
+    }
+    data_dict = {"Hyperparameters": hyperparameters}
 
     os.makedirs(final_dir_write, exist_ok=True)
     os.makedirs(intermediate_dir_write, exist_ok=True)
@@ -173,7 +181,7 @@ def main(
                 first_item["solved_at_turn"] = -1  # Set to -1 if never solved
             else:
                 successful = "Yes"
-                first_item['solved_at_turn'] = n_turn + 1  # Turn count starts at 1
+                first_item['solved_at_turn'] = n_turn  # Turn count starts at 1
 
             whether_successful.append(successful)
             item_list.append(first_item)
@@ -263,7 +271,7 @@ def main(
                     item['solved_at_turn'] = -1
                 else:
                     successful = "Yes"
-                    item['solved_at_turn'] = n_turn + 1  # Turn count starts at 1
+                    item['solved_at_turn'] = n_turn  # Turn count starts at 1
                 whether_successful.append(successful)
                 item_list.append(item)
 
@@ -294,7 +302,7 @@ def main(
 #     print("DEBUG: LTMLTM: " + str(["Query: {} \n Solved: {}".format(X[i], labels[i], flush=True) for i in range(len(X))]))
 #     return ["Query: {} \n Solved: {}".format(X[i], labels[i]) for i in range(len(X))]
 
-def LTM(X, labels, max_items=10):
+def LTM(X, labels, max_items=6):
     """
     Creates a formatted list of past queries and their success status.
     If the list exceeds max_items, it will keep the most recent ones.
