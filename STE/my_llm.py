@@ -24,6 +24,7 @@ def get_chat_completion_my(messages, max_tokens=512, temp=0.4, return_raw=False,
         "max_tokens": max_tokens,
         "temperature": temp
     }
+    is_response_empty = False
     try:
         response = requests.post(server_url, json=payload)
         response_json = response.json()
@@ -39,13 +40,15 @@ def get_chat_completion_my(messages, max_tokens=512, temp=0.4, return_raw=False,
     else:
         print("DEBUG ERROR: response is empty OR <|promptends|> not found")
         response_text = "The response is empty."
+        is_response_empty = True
     
     # Remove the prompt from the answer (cut from the head)
     if stop and stop in response_text:
         response_text = response_text.split(stop)[0].strip()
         
     print("ESCO CHAT COMPLETION MY", flush = True)
-    return response_text if not return_raw else {"response": response_text}
+    # return response_text if not return_raw else {"response": response_text}
+    return (response_text, is_response_empty)
 
 def visualize_messages(messages):
     """
@@ -73,7 +76,7 @@ def chat_my(messages, new_message, visualize=True, **params):
     print("INSIDE CHAT MY JSONED new_message is ", new_message, flush=True)
     #print("MESSAGE: ", str(messages[-1]['content']))
     # Call get_chat_completion_my without passing model
-    response = get_chat_completion_my(messages, **params)
+    response, is_response_empty = get_chat_completion_my(messages, **params)
     print("INSIDE CHAT MY response is ", response)
     messages[-1]["content"] = messages[-1]["content"].replace("<|promptends|>", "").strip()
     # clean the output of extra remaining of the chat template (llama-3-8b)
@@ -84,4 +87,4 @@ def chat_my(messages, new_message, visualize=True, **params):
     if visualize:
         visualize_messages(messages[-2:])
     print("ESCO DA CHAT MY", flush = True)
-    return messages
+    return (messages, is_response_empty)

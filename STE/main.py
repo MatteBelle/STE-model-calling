@@ -14,10 +14,10 @@ import evaluate
 import random
 
 METRIC_CACHE = {}
-TEMPERATURE = 0.7
+TEMPERATURE = 0.6
 
 def main(
-    num_sessions: int = 30,
+    num_sessions: int = 35,
     num_stm_slots: int = 2,
     max_turn: int = 3,
     intermediate_dir_write: str = "STE/results/intermediate_results/",
@@ -111,9 +111,10 @@ def main(
             ]
 
             print("DEBUG: Generating the first query using chat_my.", flush=True)
-            response = chat_my(messages, prompt_q_added_question,
-                               temp=TEMPERATURE, stop="Thought:", visualize=if_visualize, max_tokens=512)[-1]['content']
-
+            response, is_response_empty = chat_my(messages, prompt_q_added_question,
+                               temp=TEMPERATURE, stop="Thought:", visualize=if_visualize, max_tokens=512)
+            response = response[-1]['content']
+            
             messages = messages + [
                 {"role": "user", "content": prompt_q},
                 {"role": "assistant", "content": response}
@@ -132,7 +133,7 @@ def main(
 
             chains = []
             print("DEBUG: Processing chain of calls for the first query.", flush=True)
-            messages = chat_my(messages, prompt_a, temp=TEMPERATURE, stop="Evaluation Result:", visualize=if_visualize, max_tokens=512)            
+            messages, is_response_empty = chat_my(messages, prompt_a, temp=TEMPERATURE, stop="Evaluation Result:", visualize=if_visualize, max_tokens=512)            
             temp = messages[-1]['content']
 
             print("DEBUG FIRST USER ANSWER OF SESSION " + str(session_id) +  ": \n" + messages[-2]['content'] +"\n\n\n\n", flush=True)
@@ -156,7 +157,7 @@ def main(
                 parsed_response['evaluation_result'] = evaluation_result
                 chains.append(parsed_response)
 
-                messages = chat_my(messages, 'Evaluation Result: ' + evaluation_result,
+                messages, is_response_empty = chat_my(messages, 'Evaluation Result: ' + evaluation_result,
                                    temp=TEMPERATURE, stop="Evaluation Result:", visualize=if_visualize, max_tokens=512)
                 temp = messages[-1]['content']
                 print("DEBUG USER QUERY OF SESSION " + str(session_id) + ", TURN " + str(n_turn) + ", PARSING ACTION AND INPUT: \n" + messages[-2]['content'] + "\n\n\n\n", flush=True)
@@ -170,13 +171,13 @@ def main(
             first_item['chains'] = chains
 
             print("DEBUG: Running reflection to determine success for the first query.", flush=True)
-            messages = chat_my(messages, prompt_reflection, temp=TEMPERATURE, stop="Evaluation Result:", visualize=if_visualize, max_tokens=512)
+            messages, is_response_empty = chat_my(messages, prompt_reflection, temp=TEMPERATURE, stop="Evaluation Result:", visualize=if_visualize, max_tokens=512)
             res = messages[-1]['content']
             print("DEBUG USER QUERY REFLECTION OF SESSION " + str(session_id) + ": \n" + prompt_reflection + "\n\n\n\n", flush=True)
             print("DEBUG RESPONSE OF SESSION " + str(session_id) + ": \n" + res, flush=True)
             print("DEBUG END: --------------------------------------------------------------------------------------------------------------\n\n\n\n\n\n\n\n", flush=True)
-            
-            if "No" in res:
+                
+            if "No" in res or is_response_empty:
                 successful = "No"
                 first_item["solved_at_turn"] = -1  # Set to -1 if never solved
             else:
@@ -211,8 +212,9 @@ def main(
                     template_q_follow_added_question = template_q_follow
 
                 print("DEBUG: Generating follow-up query using chat_my.", flush=True)
-                response = chat_my(messages, template_q_follow_added_question,
-                                   temp=TEMPERATURE, stop="Thought:", visualize=if_visualize, max_tokens=512)[-1]['content']
+                response, is_response_empty = chat_my(messages, template_q_follow_added_question,
+                                   temp=TEMPERATURE, stop="Thought:", visualize=if_visualize, max_tokens=512)
+                response = response[-1]['content']
                 messages = messages + [
                     {"role": "user", "content": template_q_follow_added_question},
                     {"role": "assistant", "content": response}
@@ -226,7 +228,7 @@ def main(
 
                 chains = []
                 print("DEBUG: Processing chain of calls for the short-term memory slot query.", flush=True)
-                messages = chat_my(messages, template_a_follow,
+                messages, is_response_empty = chat_my(messages, template_a_follow,
                                    temp=TEMPERATURE, stop="Evaluation Result:", visualize=if_visualize, max_tokens=512)
                 temp = messages[-1]['content']
                 print("DEBUG template_a_follow OF SESSION " + str(session_id) + ", STM TURN " + str(n_stm) + ": \n" + template_a_follow + "\n\n\n\n", flush=True)
@@ -247,7 +249,7 @@ def main(
                     parsed_response['evaluation_result'] = evaluation_result
                     chains.append(parsed_response)
 
-                    messages = chat_my(messages, 'Evaluation Result: ' + evaluation_result,
+                    messages, is_response_empty = chat_my(messages, 'Evaluation Result: ' + evaluation_result,
                                        temp=TEMPERATURE, stop="Evaluation Result:", visualize=if_visualize, max_tokens=512)
                     temp = messages[-1]['content']
                     print("DEBUG USER QUERY OF SESSION " + str(session_id) + ", TURN " + str(n_turn) + ", PARSING ACTION AND INPUT: \n" + messages[-2]['content'] + "\n\n\n\n", flush=True)
@@ -260,13 +262,13 @@ def main(
                 item['chains'] = chains
 
                 print("DEBUG: Running reflection to determine success for the short-term memory slot query.", flush=True)
-                messages = chat_my(messages, prompt_reflection,
+                messages, is_response_empty = chat_my(messages, prompt_reflection,
                                    temp=TEMPERATURE, stop="Evaluation Result:", visualize=if_visualize, max_tokens=512)
                 res = messages[-1]['content']
                 print("DEBUG USER QUERY REFLECTION OF SESSION " + str(session_id) + ", TURN " + str(n_turn) + ": \n" + messages[-2]['content'] + "\n\n\n\n", flush=True)
                 print("DEBUG RESPONSE OF SESSION " + str(session_id) + ", TURN " + str(n_turn) + ": \n" + res, flush=True)
                 print("DEBUG END: --------------------------------------------------------------------------------------------------------------\n\n\n\n\n\n\n\n", flush=True)
-                if "No" in res:
+                if "No" in res or is_response_empty:
                     successful = "No"
                     item['solved_at_turn'] = -1
                 else:
@@ -488,7 +490,8 @@ def run_llm_judge_evaluation(normalized_args, API_descriptions, temp=TEMPERATURE
         "- Do NOT include any extra text before or after the JSON, except for exactly the text `'Evaluation Ends' right after the json.\n"
     )
     try:
-        response = chat_my(messages, prompt, temp=temp, stop="Evaluation Ends", visualize=False, max_tokens=max_tokens)[-1]['content']
+        response, _ = chat_my(messages, prompt, temp=temp, stop="Evaluation Ends", visualize=False, max_tokens=max_tokens)
+        response = response[-1]['content']
         return response
     except Exception as e:
         # If parsing fails, return an error message.
