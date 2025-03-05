@@ -11,7 +11,7 @@ Your task is to **output exactly one user query** that a user might naturally as
 - Do **not** repeat yourself.
 {optional_parameters}
 - The query should use all metrics above.
-- **Stop after outputting one single, not overly-complicated query.**
+- **Stop after outputting one single, simple query.**
 
 User Query:
 =========
@@ -21,7 +21,7 @@ Now, try to respond to the query using the available evaluation metrics.
 The format you use for the evaluation metric is by specifying 1) Action: the name of the metric you want to call 2) Action Input: the input parameters for the metric in a JSON string format such that predictions and references have the same number of entries in their lists. The result of the metric call will be returned starting with "Evaluation Result". *If the query requires multiple metrics call, then provide multiple Action and Action Input couples*
 
 Reminder:
-1) The only values that should follow "Action:" is one of: {metric_name}
+1) The only values that should follow "Action:" are: {metric_name}
 2) Use the following JSON string format for the evaluation arguments of each metric.
 
 Action Input:
@@ -50,7 +50,7 @@ User Query (the same you just synthesized): {query}
 
 =========
 
-Now you know a bit more about the available evaluation metrics. You can synthesize another creative user query (it should differ from the previous one) to explore the metrics further and consolidate your understanding based on what you discovered. Remember that {placeholder} is a placeholder I use for trimmed texts, so *don't* use {placeholder} in your queries. Again, just input *one* user query alone; do NOT solve the query for now.
+Now you know a bit more about the available evaluation metrics. You can synthesize another creative user query (it should differ from the previous one) to explore the metrics further and consolidate your understanding based on what you discovered. Remember that {placeholder} is a placeholder I use for trimmed texts, so *don't* use {placeholder} in your queries. Again, just input *one* simple user query alone; do NOT solve the query for now.
 {optional_parameters}
 
 User Query:
