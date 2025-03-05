@@ -1,5 +1,4 @@
 #!/bin/bash
-# filepath: /home/belletti/STE-model-calling/run_all.sh
 
 # Get information about the environment
 echo "SLURM_JOB_ID: ${SLURM_JOB_ID:-not set}"
@@ -21,19 +20,20 @@ fi
 JOB_ID=${SLURM_JOB_ID:-$(date +%s)}
 echo "Using GPU ID: $GPU_ID for job $JOB_ID"
 
-# Create a job-specific docker-compose file
-JOB_COMPOSE_FILE="docker-compose-job-${JOB_ID}.yml"
+# Define docker directory and job-specific docker-compose file path
+DOCKER_DIR="docker"
+JOB_COMPOSE_FILE="${DOCKER_DIR}/docker-compose-job-${JOB_ID}.yml"
 
 # Generate a unique port based on JOB_ID (avoid well-known ports)
 SERVER_PORT=$((10000 + (JOB_ID % 5000)))
 echo "Using port $SERVER_PORT for server"
 
 # Create a job-specific docker-compose file from template
-if [ -f "docker-compose-template.yml" ]; then
-    cp docker-compose-template.yml $JOB_COMPOSE_FILE
+if [ -f "${DOCKER_DIR}/docker-compose-template.yml" ]; then
+    cp "${DOCKER_DIR}/docker-compose-template.yml" $JOB_COMPOSE_FILE
 else
     echo "Template not found, creating from docker-compose.yml"
-    cp docker-compose.yml $JOB_COMPOSE_FILE
+    cp "${DOCKER_DIR}/docker-compose.yml" $JOB_COMPOSE_FILE
 fi
 
 # Replace placeholders in the compose file
@@ -66,16 +66,30 @@ SERVER_NAME="llm-server-${JOB_ID}"
 docker-compose -f $JOB_COMPOSE_FILE up -d --build $SERVER_NAME
 
 # Wait for server to start
-echo "Waiting for server to initialize... (7 seconds)"
-sleep 7
+echo "Waiting for server to initialize... (10 seconds)"
+sleep 10
 
-# Try to verify the server is running
+# Try to verify the server is running with the new health endpoint
 echo "Checking if server is responsive..."
-if curl -s "http://localhost:${SERVER_PORT}" > /dev/null; then
-    echo "Server is running!"
+if curl -s "http://localhost:${SERVER_PORT}/health" | grep -q "ok"; then
+    echo "Server is running and healthy!"
 else
-    echo "Warning: Could not connect to server at http://localhost:${SERVER_PORT}"
-    echo "This may be normal if the server doesn't respond to GET requests at root path"
+    echo "Warning: Health check failed, trying alternative endpoints..."
+    # Try FastAPI's docs endpoint as fallback
+    if curl -s "http://localhost:${SERVER_PORT}/docs" > /dev/null; then
+        echo "Server is running (confirmed via /docs endpoint)"
+    else
+        echo "Warning: Could not connect to server at http://localhost:${SERVER_PORT}"
+        echo "Checking server logs for errors:"
+        docker logs $SERVER_NAME | tail -n 20
+        
+        # Check if the server is using the correct port
+        PORT_IN_USE=$(docker logs $SERVER_NAME 2>&1 | grep -o "Uvicorn running on [^:]*:[0-9]*" | grep -o "[0-9]*$")
+        if [ -n "$PORT_IN_USE" ] && [ "$PORT_IN_USE" != "$SERVER_PORT" ]; then
+            echo "ERROR: Server is running on port $PORT_IN_USE instead of $SERVER_PORT"
+            echo "This is likely due to a port mismatch in the docker-compose file."
+        fi
+    fi
 fi
 
 # Start main container

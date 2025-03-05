@@ -106,6 +106,12 @@ def dynamic_context_trim(messages, max_length=8192, reserve_tokens=768):
     
     return trimmed_messages, was_trimmed, final_token_count
 
+# Add this route to llm_server.py
+@app.get("/health")
+async def health_check():
+    """Health check endpoint to verify server is running"""
+    return {"status": "ok", "port": int(os.environ.get("SERVER_PORT", 8000))}
+
 @app.post("/generate")
 async def generate_text(request: InferenceRequest):
     try:
