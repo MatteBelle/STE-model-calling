@@ -260,7 +260,7 @@ def delete_intermediate_subfolder(subfolder_path):
         print(f"DEBUG: Error deleting intermediate subfolder: {e}")
 
 
-def trim_ltm_stm(ltm_list, placeholder="[...]", max_length=2000, list_trim_threshold=40):
+def trim_ltm_stm(ltm_list, placeholder="[...]", max_length=1000, list_trim_threshold=10):
     """
     Trims long text lists in the LTM entries and replaces them with a placeholder, 
     while preserving some examples for context. List of lists are trimmed only if too long.

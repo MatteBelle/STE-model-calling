@@ -4,9 +4,8 @@ Your task is to **output exactly one user query** that a user might naturally as
 
 **Task Instructions:**  
 - The query should be **concise, natural, and human-like**.  
-- The query should **only** request metric evaluation for a set of references and predictions.    
-- The query should provide a list of creative references and predictions.  
-- Ensure that the reference and prediction lists have the same number of entries (no more than five each).
+- The query should provide a list of creative texts (according to the evaluation parameters).  
+- Ensure that the text lists have the same number of entries (no more than handful each).
 - Do **not** add explanations, descriptions, or metadata.  
 - Do **not** repeat yourself.
 {optional_parameters}
