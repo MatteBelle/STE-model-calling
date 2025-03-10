@@ -1,25 +1,20 @@
 import json
 import os
-import matplotlib.pyplot as plt
 import numpy as np
-import time
 import fire
-from transformers import pipeline  # Import Hugging Face pipeline
-from utils import find_reverse, random_choose, parse_response, strip_end, delete_intermediate_subfolder, trim_ltm_stm, get_metric_subgroup, get_parameters_optionality, build_optional_parameters_text
-from my_llm import chat_my, visualize_messages, get_chat_completion_my#, set_tokenizer
-from transformers import AutoTokenizer, AutoModelForCausalLM
-import torch
+from utils import parse_response, strip_end, delete_intermediate_subfolder, trim_ltm_stm, sanitize_for_json
+from metric_utils import get_metric_subgroup, get_parameters_optionality, build_optional_parameters_text, normalize_evaluation_args
+from my_llm import chat_my, get_chat_completion_my#, set_tokenizer
 from datetime import datetime  # For generating dynamic filenames
 import evaluate
-import random
 
 METRIC_CACHE = {}
-TEMPERATURE = 0.6
+TEMPERATURE = 0.8
 
 def main(
-    num_sessions: int = 35,
-    num_stm_slots: int = 2,
-    max_turn: int = 3,
+    num_sessions: int = 80,
+    num_stm_slots: int = 1,
+    max_turn: int = 5,
     intermediate_dir_write: str = "STE/results/intermediate_results/",
     final_dir_write: str = "STE/results/final_results/",
     if_visualize: bool = True,
@@ -61,6 +56,7 @@ def main(
     PAST_Q_MSG_pre = "Below are queries you have already explored and whether you successfully solved them with the API's help:"
     PAST_Q_MSG_post = f"Based on these, try to explore a new query that can help you understand the API further; avoid synthesizing a query that is too close to the existing ones and remember that {placeholder} is a placeholder I use for trimmed texts, so don't use {placeholder} in your query. Try different ways to formulate it (use synonyms, vary its structure, vary the length of the question, change the references parameters etc.)."
     prompt_reflection = "Do you think you successfully fulfilled this query in the end? Respond with \"Yes\" or \"No\"."
+    #prompt_correct_or_finish = "\nThere's an error in the evaluation result, correct it. When the evaluation result will be correct, immediately use \nThought: I now know the final answer\nFinal Answer:"
 
     print("DEBUG: Starting iteration over API_list.", flush=True)
     for API in API_list:
@@ -293,17 +289,6 @@ def main(
     print(f"DEBUG: Final data saved to {final_data_path}", flush=True)
     print("DEBUG: Finished main function.", flush=True)
 
-
-# def LTM(X, labels):
-#     #assert len(X) == len(labels)
-#     try:
-#         assert len(X) == len(labels)
-#     except AssertionError:
-#         print(f"DEBUG: Assertion failed! len(X, flush=True) == len(labels) '. len(X) {len(X)}, len(labels) {len(labels)}")
-#         raise  # Re-raise the exception after logging
-#     print("DEBUG: LTMLTM: " + str(["Query: {} \n Solved: {}".format(X[i], labels[i], flush=True) for i in range(len(X))]))
-#     return ["Query: {} \n Solved: {}".format(X[i], labels[i]) for i in range(len(X))]
-
 def LTM(X, labels, max_items=6):
     """
     Creates a formatted list of past queries and their success status.
@@ -331,77 +316,6 @@ def LTM(X, labels, max_items=6):
     formatted_list = ["Query: {} \n Solved: {}".format(X[i], labels[i]) for i in range(len(X))]
     print("DEBUG: LTMLTM: " + str(formatted_list))
     return formatted_list
-
-def normalize_evaluation_args(metric_name, args, API_descriptions):
-    """
-    Normalize and coerce the evaluation inputs so that they match the expected types.
-    This function uses the metadata for the given metric (from API_descriptions)
-    to determine expected types for each parameter.
-    """
-
-    try:
-        # Load metadata for the metric (the value is a JSON string)
-        metric_meta = API_descriptions[metric_name]
-    except Exception as e:
-        print(f"DEBUG: Error loading metadata for {metric_name}: {e}", flush=True)
-        metric_meta = {}
-
-    normalized_args = {}
-
-    # Merge "kwargs" into the main args dictionary if present
-    if "kwargs" in args and isinstance(args["kwargs"], dict):
-        print("DEBUG: Expanding 'kwargs' into args.", flush=True)
-        args.update(args.pop("kwargs"))
-
-    # Get a list of expected parameters from required and optional parameters.
-    param_list = metric_meta.get("required_parameters", []) + metric_meta.get("optional_parameters", [])
-
-    # Build a mapping: parameter name -> expected type (as lower-case string)
-    expected_types = {param["name"]: param["type"].lower() for param in param_list}
-
-    for key, value in args.items():
-        exp_type = expected_types.get(key, None)
-
-        if exp_type is None:
-            # If we do not have a type specification, leave the value as is.
-            normalized_args[key] = value
-        else:
-            try:
-                if exp_type.startswith("list"):
-                    # Expected a list.
-                    # Instead of splitting by commas, simply wrap the string in a list.
-                    if not isinstance(value, list):
-                        if isinstance(value, str):
-                            # Do not split by commas; treat the entire string as a single list element.
-                            normalized_args[key] = [value.strip()]
-                        else:
-                            normalized_args[key] = [value]
-                    else:
-                        normalized_args[key] = value
-                elif exp_type == "boolean":
-                    # Convert string representations to boolean.
-                    if isinstance(value, str):
-                        normalized_args[key] = True if value.lower() in ["true", "1", "yes"] else False
-                    else:
-                        normalized_args[key] = bool(value)
-                elif exp_type == "number":
-                    # Attempt to convert to integer or float.
-                    if isinstance(value, (int, float)):
-                        normalized_args[key] = value
-                    else:
-                        str_val = str(value)
-                        if "." in str_val:
-                            normalized_args[key] = float(str_val)
-                        else:
-                            normalized_args[key] = int(str_val)
-                elif exp_type == "string":
-                    normalized_args[key] = str(value)
-                else:
-                    normalized_args[key] = value
-            except Exception as e:
-                print(f"DEBUG: Error normalizing parameter '{key}' with value '{value}': {e}", flush=True)
-                normalized_args[key] = value
-    return normalized_args
 
 
 def run_evaluation(metric_name, args, API_list, API_descriptions, truncate=False):
@@ -447,7 +361,7 @@ def run_evaluation(metric_name, args, API_list, API_descriptions, truncate=False
         return result_str
     except Exception as e:
         print("DEBUG ERROR: " + str(e), flush=True)
-        return f"The Action or Action Input is incorrect: {str(e)}. Fix it and provide new Action or Action input."
+        return f"ERROR: The Action or Action Input is incorrect: {str(e)}. Fix it and provide new Action or Action input. When the Action or Action Input will be correct, immediately use \nThought: I now know the final answer\nFinal Answer:"
 
 def run_llm_judge_evaluation(normalized_args, API_descriptions, temp=TEMPERATURE, max_tokens=512):
     """
@@ -519,19 +433,6 @@ def save_intermediate_results(API, session_id, all_sessions, subfolder_path):
         print(f"DEBUG: Intermediate results saved to {intermediate_filename}", flush=True)
     except Exception as e:
         print(f"DEBUG: Error saving intermediate results: {e}", flush=True)
-
-def sanitize_for_json(obj):
-    if isinstance(obj, (np.integer, np.int64)):
-        return int(obj)
-    if isinstance(obj, (np.floating, np.float32, np.float64)):
-        return float(obj)
-    if isinstance(obj, (np.bool_)):
-        return bool(obj)
-    if isinstance(obj, dict):
-        return {str(key): sanitize_for_json(value) for key, value in obj.items()}
-    if isinstance(obj, list):
-        return [sanitize_for_json(item) for item in obj]
-    return obj
 
 if __name__ == '__main__':
     fire.Fire(main)

@@ -1,0 +1,44 @@
+services:
+  llm-server-comparison:
+    build:
+      context: .
+      dockerfile: Dockerfile.server.comparison  # Use comparison-specific Dockerfile
+    container_name: llm-server-comparison
+    network_mode: "host"
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              capabilities: [gpu]
+              device_ids: ['0']
+    environment:
+      - HF_HOME=/huggingface_cache
+      - HUGGING_FACE_HUB_TOKEN=<your_token>
+    volumes:
+      - /home/belletti/huggingface_cache:/huggingface_cache
+      - /home/belletti/STE-model-calling/STE:/home/belletti/STE-model-calling/STE
+    
+  model-comparison:
+    build:
+      context: .
+      dockerfile: Dockerfile.main
+    container_name: model-comparison
+    network_mode: "host"
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              capabilities: [gpu]
+              device_ids: ['0']
+    volumes:
+      - /home/belletti/huggingface_cache:/huggingface_cache
+      - ./STE/test_compare/outputs:/home/belletti/STE-model-calling/STE/test_compare/outputs
+      - ./STE:/home/belletti/STE-model-calling/STE
+    environment:
+      - MODEL_SERVER_URL=http://localhost:8000/generate
+      - PYTHONPATH=/home/belletti/STE-model-calling
+    depends_on:
+      - llm-server-comparison
+    command: ["python3", "-m", "STE.test_compare.compare_models"]

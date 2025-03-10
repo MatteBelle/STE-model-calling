@@ -1,0 +1,40 @@
+# 15/02: ATTEMPT AT REDUCING DOCKERFILE SIZE
+
+# Use a smaller base image (switch from "devel" to "runtime" unless you need compilers)
+FROM nvidia/cuda:12.3.2-runtime-ubuntu20.04
+
+LABEL maintainer="disi-unibo-nlp"
+
+ENV DEBIAN_FRONTEND=noninteractive
+WORKDIR /home/belletti/STE-model-calling
+
+# Install only essential system dependencies (drop unnecessary ones like nano, wget)
+RUN apt-get update -y && \
+    apt-get install -y python3.9 python3.9-venv python3-pip git && \
+    apt-get autoremove -y && \
+    apt-get clean -y && \
+    rm -rf /var/lib/apt/lists/*
+
+# Make Python 3.9 the default
+RUN update-alternatives --install /usr/bin/python3 python3 /usr/bin/python3.9 1 && \
+    update-alternatives --set python3 /usr/bin/python3.9
+
+# Upgrade pip and install Python dependencies
+COPY STE/requirements.txt . 
+RUN pip3 install --no-cache-dir --upgrade pip && \
+    pip3 install --no-cache-dir -r requirements.txt
+RUN pip3 install --no-cache-dir termcolor regex fire tqdm python-dateutil
+
+# Ensure Hugging Face models and cache are stored efficiently
+ENV HF_HOME="/huggingface_cache"
+
+# Copy only necessary source files
+COPY STE/ /home/belletti/STE-model-calling/STE/
+
+# Add an entrypoint script to allow different run modes
+COPY entrypoint.sh /home/belletti/STE-model-calling/entrypoint.sh
+RUN chmod +x /home/belletti/STE-model-calling/entrypoint.sh
+
+ENTRYPOINT ["/home/belletti/STE-model-calling/entrypoint.sh"]
+# Default to running the main STE script
+CMD ["main"]

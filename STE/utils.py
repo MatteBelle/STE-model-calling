@@ -128,137 +128,6 @@ def parse_response(response, API_name_list, api_descriptions,
 
     return item
 
-def get_metric_subgroup(metric_name: str = None, json_path: str = "STE/tool_metadata/API_subgroups.json"):
-    """
-    Loads the subgroups from the given JSON file and returns a single subgroup 
-    with 'name' and 'metrics'. If 'metric_name' is provided, only subgroups 
-    containing that metric will be considered.
-    
-    Returns:
-        dict: {
-            "name": <subgroup_name>,
-            "metrics": <list_of_metrics_in_that_subgroup>
-        }
-    """
-    if not os.path.exists(json_path):
-        raise FileNotFoundError(f"Subgroups JSON file not found at: {json_path}")
-
-    with open(json_path, "r", encoding="utf-8") as f:
-        subgroups = json.load(f)
-
-    # Convert dict of subgroups to a list
-    subgroup_list = list(subgroups.values())
-
-    if metric_name:
-        # Filter subgroups to only those containing the given metric
-        filtered_subgroups = [
-            subgroup for subgroup in subgroup_list
-            if metric_name in subgroup["metrics"]
-        ]
-        if not filtered_subgroups:
-            raise ValueError(
-                f"No subgroups found containing the metric '{metric_name}'. "
-                f"Available subgroups: {[sg['name'] for sg in subgroup_list]}"
-            )
-        chosen_subgroup = random.choice(filtered_subgroups)
-    else:
-        chosen_subgroup = random.choice(subgroup_list)
-
-    return {
-        "name": chosen_subgroup["name"],
-        "metrics": chosen_subgroup["metrics"]
-    }
-    
-
-def get_parameters_optionality(metrics):
-    """
-    For each metric in 'metrics', assign a boolean flag 
-    that is True with 30% probability (False otherwise).
-
-    Returns:
-        dict: { metric_name: bool }
-    """
-    optional_flags = {}
-    for metric in metrics:
-        optional_flags[metric] = (random.random() < 0.6)
-    return optional_flags
-
-
-def get_random_metric_subgroup_with_flags(
-    metric_name: str = None, 
-    json_path: str = "STE/tool_metadata/API_subgroups.json"
-):
-    """
-    Wrapper that:
-      1) Retrieves a subgroup via get_metric_subgroup.
-      2) Retrieves parameters optionality flags via get_parameters_optionality.
-      3) Combines them into a single dictionary.
-    """
-    subgroup = get_metric_subgroup(metric_name, json_path)
-    optional_flags = get_parameters_optionality(subgroup["metrics"])
-
-    return {
-        "name": subgroup["name"],
-        "metrics": subgroup["metrics"],
-        "optional_flags": optional_flags
-    }
-
-
-def build_optional_parameters_text(API_name_list, optional_flags, API_descriptions):
-    """
-    Create a guidance text describing whether (True) or not (False)
-    to include optional parameters for each metric in the user query.
-    """
-    lines = []
-    lines.append("**Parameters Mandatory Instructions**")
-
-    for metric in API_name_list:
-        # If the metric is missing from optional_flags, skip or default to False
-        flag = optional_flags.get(metric, False)
-        # Get the optional parameters from API_descriptions
-        metric_info = API_descriptions.get(metric, {})
-        optional_params = metric_info.get("optional_parameters", [])
-        # If no optional parameters exist, skip the instruction
-        if not optional_params:
-            lines.append(f"- For {metric}: (No optional parameters available)")
-            continue
-        # Build a readable list of optional param names
-        param_names = [p["name"] for p in optional_params]
-        if flag:
-            lines.append(
-                f"- For {metric}: You MUST include these optional parameters in your user query: {', '.join(param_names)}."
-            )
-        else:
-            lines.append(
-                f"- For {metric}: Do NOT include any optional parameters in your user query."
-            )
-            
-    lines.append("In case optional parameters ara asked to be included, the query must explicitly specify both the parameters and a chosen value.")
-    # Join everything into a single text block
-    return "\n".join(lines)
-
-
-def delete_intermediate_subfolder(subfolder_path):
-    """
-    Deletes the entire subfolder and all its contents using os.
-    """
-    try:
-        if os.path.exists(subfolder_path):
-            # Walk through the directory tree and delete files and subdirectories
-            for root, dirs, files in os.walk(subfolder_path, topdown=False):
-                for file in files:
-                    file_path = os.path.join(root, file)
-                    os.remove(file_path)  # Delete file
-                for directory in dirs:
-                    dir_path = os.path.join(root, directory)
-                    os.rmdir(dir_path)  # Delete empty directory
-            os.rmdir(subfolder_path)  # Finally, delete the main folder
-            print(f"DEBUG: Successfully deleted intermediate subfolder: {subfolder_path}")
-        else:
-            print(f"DEBUG: Subfolder does not exist: {subfolder_path}")
-    except Exception as e:
-        print(f"DEBUG: Error deleting intermediate subfolder: {e}")
-
 
 def trim_ltm_stm(ltm_list, placeholder="[...]", max_length=1000, list_trim_threshold=10):
     """
@@ -308,6 +177,42 @@ def trim_ltm_stm(ltm_list, placeholder="[...]", max_length=1000, list_trim_thres
         trimmed_ltm.append(trimmed_entry)
 
     return trimmed_ltm
+
+
+def sanitize_for_json(obj):
+    if isinstance(obj, (np.integer, np.int64)):
+        return int(obj)
+    if isinstance(obj, (np.floating, np.float32, np.float64)):
+        return float(obj)
+    if isinstance(obj, (np.bool_)):
+        return bool(obj)
+    if isinstance(obj, dict):
+        return {str(key): sanitize_for_json(value) for key, value in obj.items()}
+    if isinstance(obj, list):
+        return [sanitize_for_json(item) for item in obj]
+    return obj
+
+
+def delete_intermediate_subfolder(subfolder_path):
+    """
+    Deletes the entire subfolder and all its contents using os.
+    """
+    try:
+        if os.path.exists(subfolder_path):
+            # Walk through the directory tree and delete files and subdirectories
+            for root, dirs, files in os.walk(subfolder_path, topdown=False):
+                for file in files:
+                    file_path = os.path.join(root, file)
+                    os.remove(file_path)  # Delete file
+                for directory in dirs:
+                    dir_path = os.path.join(root, directory)
+                    os.rmdir(dir_path)  # Delete empty directory
+            os.rmdir(subfolder_path)  # Finally, delete the main folder
+            print(f"DEBUG: Successfully deleted intermediate subfolder: {subfolder_path}")
+        else:
+            print(f"DEBUG: Subfolder does not exist: {subfolder_path}")
+    except Exception as e:
+        print(f"DEBUG: Error deleting intermediate subfolder: {e}")
     
 if __name__ == '__main__':
     print()

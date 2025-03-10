@@ -176,4 +176,5 @@ cython_debug/
 run_docker.sh
 slurm*
 STE/results/
-STE/slurm*
+STE/slurm
+STE/finetuning/hf_token.txt

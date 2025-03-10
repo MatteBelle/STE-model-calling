@@ -1,0 +1,46 @@
+services:
+  llm-server-main:
+    build:
+      context: .
+      dockerfile: Dockerfile.server.main  # Use main-specific Dockerfile
+    container_name: llm-server-main
+    network_mode: "host"
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              capabilities: [gpu]
+              device_ids: ['3']
+    environment:
+      - HF_HOME=/huggingface_cache
+      - HUGGING_FACE_HUB_TOKEN=<your_token>
+    volumes:
+      - /home/belletti/huggingface_cache:/huggingface_cache
+      - /home/belletti/STE-model-calling/STE:/home/belletti/STE-model-calling/STE
+
+  llm-main:
+    build:
+      context: .
+      dockerfile: Dockerfile.main
+    container_name: llm-main
+    network_mode: "host"
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              capabilities: [gpu]
+              device_ids: ['3']
+    environment:
+      - HF_HOME=/huggingface_cache
+      - HUGGING_FACE_HUB_TOKEN=<your_token>
+      - NUM_EPISODES=40
+      - NUM_STM_SLOTS=4
+      - MAX_TURN=4
+      - MODEL_SERVER_URL=http://localhost:8001/generate
+    volumes:
+      - /home/belletti/STE-model-calling/STE:/home/belletti/STE-model-calling/STE
+      - /home/belletti/huggingface_cache:/huggingface_cache
+    depends_on:
+      - llm-server-main

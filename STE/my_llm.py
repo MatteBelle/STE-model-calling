@@ -1,10 +1,7 @@
-from transformers import AutoModelForCausalLM, AutoTokenizer
-import torch
 from termcolor import colored
 from copy import deepcopy
 import os
-import requests  # For HTTP calls to the llm_server
-import json
+import requests
 
 # Set up the Hugging Face cache directory
 HF_HOME = "/huggingface_cache"

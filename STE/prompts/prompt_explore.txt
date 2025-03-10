@@ -4,13 +4,13 @@ Your task is to **output exactly one user query** that a user might naturally as
 
 **Task Instructions:**  
 - The query should be **concise, natural, and human-like**.  
-- The query should provide a list of creative texts (according to the evaluation parameters).  
-- Ensure that the text lists have the same number of entries (no more than handful each).
+- The query should provide a list of creative references and/or predictions (according to the evaluation parameters).  
+- If you provide both a list of references and one of predictions, ensure they have the same number of entries (no more than 6 each).
 - Do **not** add explanations, descriptions, or metadata.  
 - Do **not** repeat yourself.
 {optional_parameters}
-- The query should use all metrics above.
-- **Stop after outputting one single, simple query.**
+- The query should use all metrics above citing their names.
+- **Stop after outputting one single complex query.**
 
 User Query:
 =========
@@ -49,7 +49,7 @@ User Query (the same you just synthesized): {query}
 
 =========
 
-Now you know a bit more about the available evaluation metrics. You can synthesize another creative user query (it should differ from the previous one) to explore the metrics further and consolidate your understanding based on what you discovered. Remember that {placeholder} is a placeholder I use for trimmed texts, so *don't* use {placeholder} in your queries. Again, just input *one* simple user query alone; do NOT solve the query for now.
+Now you know a bit more about the available evaluation metrics. You can synthesize another creative user query (it should differ from the previous one) to explore the metrics further and consolidate your understanding based on what you discovered. Remember that {placeholder} is a placeholder I use for trimmed texts, so *don't* use {placeholder} in your queries. Again, just input *one* complex user query alone; do NOT solve the query for now.
 {optional_parameters}
 
 User Query:

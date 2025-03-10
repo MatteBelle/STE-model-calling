@@ -1,0 +1,67 @@
+services:
+  llm-server:
+    build:
+      context: .
+      dockerfile: Dockerfile.server
+    container_name: llm-server
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              #count: 1
+              capabilities: [gpu]
+              device_ids: ['0']
+    environment:
+      - HF_HOME=/huggingface_cache
+      - HUGGING_FACE_HUB_TOKEN=<your_token>
+    volumes:
+      - /home/belletti/huggingface_cache:/huggingface_cache
+      - /home/belletti/STE-model-calling/STE:/home/belletti/STE-model-calling/STE
+    ports:
+      - "8000:8000"
+
+  llm-main:
+    build:
+      context: .
+      dockerfile: Dockerfile.main
+    container_name: llm-main
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              #count: 1
+              capabilities: [gpu]
+              device_ids: ['0']
+    environment:
+      - HF_HOME=/huggingface_cache
+      - HUGGING_FACE_HUB_TOKEN=<your_token>
+      - NUM_EPISODES=40
+      - NUM_STM_SLOTS=4
+      - MAX_TURN=4
+      - MODEL_SERVER_URL=http://llm-server:8000/generate
+    volumes:
+      - /home/belletti/STE-model-calling/STE:/home/belletti/STE-model-calling/STE
+      - ./STE/results:/home/belletti/STE-model-calling/STE/results
+      - /home/belletti/huggingface_cache:/huggingface_cache
+    depends_on:
+      - llm-server
+    
+  model-comparison:
+    build:
+      context: .
+      dockerfile: Dockerfile.main
+    volumes:
+      - huggingface_cache:/huggingface_cache
+      - ./STE/test_compare/outputs:/home/belletti/STE-model-calling/STE/test_compare/outputs
+      - ./STE:/home/belletti/STE-model-calling/STE
+    environment:
+      - MODEL_SERVER_URL=http://llm-server:8000/generate
+      - PYTHONPATH=/home/belletti/STE-model-calling
+    depends_on:
+      - llm-server
+    command: compare
+
+volumes:
+  huggingface_cache:
