@@ -178,3 +178,5 @@ slurm*
 STE/results/
 STE/slurm
 STE/finetuning/hf_token.txt
+STE/finetuning/unsloth*
+STE/finetuning/outputs*
